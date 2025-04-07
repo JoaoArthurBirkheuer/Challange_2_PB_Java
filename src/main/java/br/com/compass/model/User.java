@@ -10,16 +10,26 @@ public abstract class User {
 	private String passwordHash;
 	private LocalDateTime createdAt; // ÚTIL PARA ENVIAR AO LOG
 									 // CASO CONTRÁRIO, SERIA DESNECESSÁRIO
+	private String email;
 	
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
 	public User(){}
 
-	public User(Long id, String cpf, String name, String passwordHash, LocalDateTime createdAt) {
+	public User(Long id, String cpf, String name, String passwordHash, LocalDateTime createdAt, String email) {
 		super();
 		this.id = id;
 		this.cpf = cpf;
 		this.name = name;
 		this.passwordHash = passwordHash;
 		this.createdAt = LocalDateTime.now();
+		this.email = email;
 	}
 
 	public Long getId() {
