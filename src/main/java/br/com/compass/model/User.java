@@ -1,16 +1,38 @@
 package br.com.compass.model;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn(name = "user_type")
 public abstract class User {
-	private Long id;
-	private String cpf;
-	private String name;
-	private String passwordHash;
-	private LocalDateTime createdAt; // ÚTIL PARA ENVIAR AO LOG
-									 // CASO CONTRÁRIO, SERIA DESNECESSÁRIO
-	private String email;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true, length = 14)
+    private String cpf;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false)
+    private String passwordHash;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(nullable = false)
+    private Boolean blocked = false;
+
+    @Column(nullable = false)
+    private Integer loginAttempts = 0;
+
+    @Column(nullable = false)
+    private String email;
 	
 	public String getEmail() {
 		return email;

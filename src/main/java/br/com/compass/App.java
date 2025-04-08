@@ -31,7 +31,6 @@ public class App {
                     bankMenu(scanner);
                     return;
                 case 2:
-                    // ToDo...
                     System.out.println("Account Opening.");
                     break;
                 case 0:

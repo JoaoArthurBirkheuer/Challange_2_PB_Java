@@ -45,7 +45,7 @@ public class Account {
     }
 
     public void requestReversal(Transaction t, String reason) {
-        ReversalRequest request = new ReversalRequest(t, this, reason);
+        // ReversalRequest request = new ReversalRequest(t, this, reason);
         // Este método apenas cria. O Manager deve aprovar/rejeitar.
     }
 

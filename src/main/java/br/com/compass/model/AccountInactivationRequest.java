@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 import br.com.compass.model.enums.RequestStatus;
 
-public class AccountRemovalRequest {
+public class AccountInactivationRequest {
     private Long id;
     private RequestStatus status = RequestStatus.PENDING;
     private String reason;
@@ -16,7 +16,7 @@ public class AccountRemovalRequest {
     private Client requester;
     private Manager resolvedBy;
 
-    public AccountRemovalRequest(Account account, Client requester, String reason) {
+    public AccountInactivationRequest(Account account, Client requester, String reason) {
         this.targetAccount = account;
         this.requester = requester;
         this.reason = reason;
@@ -26,8 +26,8 @@ public class AccountRemovalRequest {
         this.status = RequestStatus.APPROVED;
         this.resolvedBy = manager;
         this.resolutionDate = LocalDateTime.now();
-        this.resolutionNotes = "Conta aprovada para deleção";
-        this.targetAccount.setActive(false); // Ou alguma flag específica
+        this.resolutionNotes = "Account approved for deletion";
+        this.targetAccount.setActive(false);
     }
 
     public void reject(Manager manager, String notes) {
