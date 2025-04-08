@@ -1,62 +1,49 @@
 package br.com.compass.model;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 
 import br.com.compass.model.enums.AccountType;
-import br.com.compass.model.enums.TransactionType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
+@Entity
+@Table(name = "accounts", indexes = {
+    @Index(name = "idx_account_email", columnList = "email"),
+    @Index(name = "idx_account_account_number", columnList = "accountNumber")
+})
 public class Account {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(unique = true, nullable = false)
     private String accountNumber;
+
+    @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private String email;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private AccountType type;
-    private boolean active;
 
-    private List<Transaction> deposits = new ArrayList<>();
-    private List<Transaction> withdrawals = new ArrayList<>();
-    private List<Transaction> transactionsSent = new ArrayList<>();
-    private List<Transaction> transactionsReceived = new ArrayList<>();
+    @Column(nullable = false)
+    private Boolean active = true;
 
-    public Transaction deposit(BigDecimal amount) {
-        Transaction t = new Transaction(amount, TransactionType.DEPOSIT, this, null);
-        deposits.add(t);
-        balance = balance.add(amount);
-        return t;
-    }
-
-    public Transaction withdraw(BigDecimal amount) {
-        if (balance.compareTo(amount) < 0) throw new IllegalArgumentException("Saldo insuficiente");
-        Transaction t = new Transaction(amount, TransactionType.WITHDRAWAL, this, null);
-        withdrawals.add(t);
-        balance = balance.subtract(amount);
-        return t;
-    }
-
-    public Transaction transfer(Account target, BigDecimal amount) {
-        if (balance.compareTo(amount) < 0) throw new IllegalArgumentException("Saldo insuficiente");
-        Transaction t = new Transaction(amount, TransactionType.TRANSFER_OUT, this, target);
-        transactionsSent.add(t);
-        target.transactionsReceived.add(t);
-        this.balance = this.balance.subtract(amount);
-        target.balance = target.balance.add(amount);
-        return t;
-    }
-
-    public void requestReversal(Transaction t, String reason) {
-        // ReversalRequest request = new ReversalRequest(t, this, reason);
-        // Este método apenas cria. O Manager deve aprovar/rejeitar.
-    }
-
-    public List<Transaction> getFullHistory() {
-        List<Transaction> history = new ArrayList<>();
-        history.addAll(deposits);
-        history.addAll(withdrawals);
-        history.addAll(transactionsSent);
-        history.addAll(transactionsReceived);
-        return history;
-    }
+    @ManyToOne
+    @JoinColumn(name = "client_id", nullable = false)
+    private Client owner;
 
 	public Long getId() {
 		return id;
@@ -82,6 +69,14 @@ public class Account {
 		this.balance = balance;
 	}
 
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
 	public AccountType getType() {
 		return type;
 	}
@@ -90,46 +85,23 @@ public class Account {
 		this.type = type;
 	}
 
-	public boolean isActive() {
+	public Boolean getActive() {
 		return active;
 	}
 
-	public List<Transaction> getDeposits() {
-		return deposits;
+	public void setActive(Boolean active) {
+		this.active = active;
 	}
 
-	public void setDeposits(List<Transaction> deposits) {
-		this.deposits = deposits;
+	public Client getOwner() {
+		return owner;
 	}
 
-	public List<Transaction> getWithdrawals() {
-		return withdrawals;
+	public void setOwner(Client owner) {
+		this.owner = owner;
 	}
 
-	public void setWithdrawals(List<Transaction> withdrawals) {
-		this.withdrawals = withdrawals;
-	}
-
-	public List<Transaction> getTransactionsSent() {
-		return transactionsSent;
-	}
-
-	public void setTransactionsSent(List<Transaction> transactionsSent) {
-		this.transactionsSent = transactionsSent;
-	}
-
-	public List<Transaction> getTransactionsReceived() {
-		return transactionsReceived;
-	}
-
-	public void setTransactionsReceived(List<Transaction> transactionsReceived) {
-		this.transactionsReceived = transactionsReceived;
-	}
-
-	public void setActive(boolean unlock) {
-		// TODO Auto-generated method stub
-		
-	}
+    // Relacionamentos com transações (depois implementamos)
 
     
 }

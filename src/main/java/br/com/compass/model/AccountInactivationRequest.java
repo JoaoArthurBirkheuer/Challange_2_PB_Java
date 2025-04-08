@@ -3,38 +3,59 @@ package br.com.compass.model;
 import java.time.LocalDateTime;
 
 import br.com.compass.model.enums.RequestStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
+@Entity
+@Table(name = "tb_account_inactivation_requests")
 public class AccountInactivationRequest {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private RequestStatus status = RequestStatus.PENDING;
+
+    @Column(nullable = false)
     private String reason;
+
+    @Column(nullable = false)
     private LocalDateTime requestDate = LocalDateTime.now();
+
     private LocalDateTime resolutionDate;
+
     private String resolutionNotes;
 
-    private Account targetAccount;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "account_id")
+    private Account account;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "client_id")
     private Client requester;
-    private Manager resolvedBy;
 
-    public AccountInactivationRequest(Account account, Client requester, String reason) {
-        this.targetAccount = account;
-        this.requester = requester;
-        this.reason = reason;
-    }
+    @ManyToOne
+    @JoinColumn(name = "manager_id")
+    private Manager resolver;
 
-    public void approve(Manager manager) {
+    public void approve() {
         this.status = RequestStatus.APPROVED;
-        this.resolvedBy = manager;
         this.resolutionDate = LocalDateTime.now();
-        this.resolutionNotes = "Account approved for deletion";
-        this.targetAccount.setActive(false);
     }
 
-    public void reject(Manager manager, String notes) {
+    public void reject(String notes) {
         this.status = RequestStatus.REJECTED;
-        this.resolvedBy = manager;
-        this.resolutionDate = LocalDateTime.now();
         this.resolutionNotes = notes;
+        this.resolutionDate = LocalDateTime.now();
     }
 
 	public Long getId() {
@@ -85,12 +106,12 @@ public class AccountInactivationRequest {
 		this.resolutionNotes = resolutionNotes;
 	}
 
-	public Account getTargetAccount() {
-		return targetAccount;
+	public Account getAccount() {
+		return account;
 	}
 
-	public void setTargetAccount(Account targetAccount) {
-		this.targetAccount = targetAccount;
+	public void setAccount(Account account) {
+		this.account = account;
 	}
 
 	public Client getRequester() {
@@ -101,12 +122,12 @@ public class AccountInactivationRequest {
 		this.requester = requester;
 	}
 
-	public Manager getResolvedBy() {
-		return resolvedBy;
+	public Manager getResolver() {
+		return resolver;
 	}
 
-	public void setResolvedBy(Manager resolvedBy) {
-		this.resolvedBy = resolvedBy;
+	public void setResolver(Manager resolver) {
+		this.resolver = resolver;
 	}
 
     

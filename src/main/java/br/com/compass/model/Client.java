@@ -1,27 +1,16 @@
 package br.com.compass.model;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+import jakarta.persistence.*;
 import java.util.List;
 
+@Entity
+@Table(name = "tb_clients")
 public class Client extends User {
-    private List<Account> accounts = new ArrayList<>();
 
-    public Client() {}
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Account> accounts;
 
-    public Client(Long id, String cpf, String name, String passwordHash, LocalDateTime createdAt, String email) {
-        super(id, cpf, name, passwordHash, createdAt, email);
-    }
-
-    public List<Account> getAccounts() {
-        return accounts;
-    }
-
-    public void addAccount(Account account) {
-        this.accounts.add(account);
-    }
-    
-    public void requestAccountRemoval(Account account) {
-    	
-    }
+	public List<Account> getAccounts() {
+		return accounts;
+	}
 }

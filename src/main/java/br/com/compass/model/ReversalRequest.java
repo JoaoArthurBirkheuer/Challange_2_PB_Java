@@ -3,23 +3,49 @@ package br.com.compass.model;
 import java.time.LocalDateTime;
 
 import br.com.compass.model.enums.RequestStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
+@Entity
+@Table(name = "tb_reversal_requests")
 public class ReversalRequest {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private RequestStatus status = RequestStatus.PENDING;
-    private String reason;
-    private LocalDateTime requestDate = LocalDateTime.now();
-    private LocalDateTime resolutionDate;
-    private String resolutionNotes;
-    private Transaction transaction;
-    private Client requester;
-    private Manager resolvedBy;
 
-    public ReversalRequest(Transaction transaction, Account account, String reason) {
-        this.transaction = transaction;
-        this.reason = reason;
-        
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RequestStatus status = RequestStatus.PENDING;
+
+    @Column(nullable = false)
+    private String reason;
+
+    @Column(nullable = false)
+    private LocalDateTime requestDate = LocalDateTime.now();
+
+    private LocalDateTime resolutionDate;
+
+    private String resolutionNotes;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "transaction_id")
+    private Transaction transaction;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "client_id")
+    private Client requester;
+
+    @ManyToOne
+    @JoinColumn(name = "manager_id")
+    private Manager resolver;
 
 	public Long getId() {
 		return id;
@@ -85,19 +111,13 @@ public class ReversalRequest {
 		this.requester = requester;
 	}
 
-	public Manager getResolvedBy() {
-		return resolvedBy;
+	public Manager getResolver() {
+		return resolver;
 	}
 
-	public void setResolvedBy(Manager resolvedBy) {
-		this.resolvedBy = resolvedBy;
+	public void setResolver(Manager resolver) {
+		this.resolver = resolver;
 	}
 
-	@Override
-	public String toString() {
-		return "ReversalRequest [id=" + id + ", status=" + status + ", reason=" + reason + ", requestDate="
-				+ requestDate + ", resolutionDate=" + resolutionDate + ", resolutionNotes=" + resolutionNotes
-				+ ", transaction=" + transaction + ", requester=" + requester + ", resolvedBy=" + resolvedBy + "]";
-	}
-
+    
 }

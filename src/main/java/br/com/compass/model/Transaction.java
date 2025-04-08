@@ -4,23 +4,44 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import br.com.compass.model.enums.TransactionType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
+@Entity
+@Table(name = "tb_transactions")
 public class Transaction {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private BigDecimal amount;
-    private LocalDateTime timestamp;
-    private TransactionType type;
-    private Account sourceAccount;
-    private Account targetAccount;
-    private boolean isReversible = true;
 
-    public Transaction(BigDecimal amount, TransactionType type, Account source, Account target) {
-        this.amount = amount;
-        this.type = type;
-        this.sourceAccount = source;
-        this.targetAccount = target;
-        this.timestamp = LocalDateTime.now();
-    }
+    @Column(nullable = false)
+    private BigDecimal amount;
+
+    @Column(nullable = false)
+    private LocalDateTime timestamp = LocalDateTime.now();
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TransactionType type;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "source_account_id")
+    private Account sourceAccount;
+
+    @ManyToOne
+    @JoinColumn(name = "target_account_id")
+    private Account targetAccount;
+
+    @Column(nullable = false)
+    private Boolean isReversible = true;
 
     public void markAsIrreversible() {
         this.isReversible = false;
@@ -74,20 +95,12 @@ public class Transaction {
 		this.targetAccount = targetAccount;
 	}
 
-	public boolean isReversible() {
+	public Boolean getIsReversible() {
 		return isReversible;
 	}
 
-	public void setReversible(boolean isReversible) {
+	public void setIsReversible(Boolean isReversible) {
 		this.isReversible = isReversible;
 	}
 
-	@Override
-	public String toString() {
-		return "Transaction [id=" + id + ", amount=" + amount + ", timestamp=" + timestamp + ", type=" + type
-				+ ", sourceAccount=" + sourceAccount + ", targetAccount=" + targetAccount + ", isReversible="
-				+ isReversible + "]";
-	}
-
-    
 }

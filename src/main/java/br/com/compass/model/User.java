@@ -2,18 +2,18 @@ package br.com.compass.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
-@DiscriminatorColumn(name = "user_type")
+@Table(name = "tb_users", indexes = {
+    @Index(name = "user_cpf", columnList = "cpf")
+})
 public abstract class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 14)
+    @Column(unique = true, nullable = false, length = 14)
     private String cpf;
 
     @Column(nullable = false)
@@ -23,36 +23,29 @@ public abstract class User {
     private String passwordHash;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private Boolean blocked = false;
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(nullable = false)
     private Integer loginAttempts = 0;
 
     @Column(nullable = false)
-    private String email;
-	
-	public String getEmail() {
-		return email;
-	}
+    private Boolean blocked = false;
+    
+    @Column(nullable = false)
+    private Boolean inactive = false;
 
-	public void setEmail(String email) {
-		this.email = email;
-	}
+    public void incrementLoginAttempts() {
+        this.loginAttempts++;
+        if (this.loginAttempts >= 3) this.blocked = true;
+    }
 
-	public User(){}
+    public void resetLoginAttempts() {
+        this.loginAttempts = 0;
+    }
 
-	public User(Long id, String cpf, String name, String passwordHash, LocalDateTime createdAt, String email) {
-		super();
-		this.id = id;
-		this.cpf = cpf;
-		this.name = name;
-		this.passwordHash = passwordHash;
-		this.createdAt = LocalDateTime.now();
-		this.email = email;
-	}
+    public boolean validateLogin(String passwordHashAttempt) {
+        return this.passwordHash.equals(passwordHashAttempt);
+    }
 
 	public Long getId() {
 		return id;
@@ -94,29 +87,27 @@ public abstract class User {
 		this.createdAt = createdAt;
 	}
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(cpf, createdAt, id, name, passwordHash);
+	public Integer getLoginAttempts() {
+		return loginAttempts;
 	}
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		User other = (User) obj;
-		return Objects.equals(cpf, other.cpf) && Objects.equals(createdAt, other.createdAt)
-				&& Objects.equals(id, other.id) && Objects.equals(name, other.name)
-				&& Objects.equals(passwordHash, other.passwordHash);
+	public void setLoginAttempts(Integer loginAttempts) {
+		this.loginAttempts = loginAttempts;
 	}
 
-	@Override
-	public String toString() {
-		return "User [id=" + id + ", cpf=" + cpf + ", name=" + name + ", passwordHash=" + passwordHash + ", createdAt="
-				+ createdAt + "]";
+	public Boolean getBlocked() {
+		return blocked;
 	}
-	
+
+	public void setBlocked(Boolean blocked) {
+		this.blocked = blocked;
+	}
+
+	public Boolean getInactive() {
+		return inactive;
+	}
+
+	public void setInactive(Boolean inactive) {
+		this.inactive = inactive;
+	}
 }
