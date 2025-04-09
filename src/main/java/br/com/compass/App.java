@@ -1,18 +1,21 @@
 package br.com.compass;
 
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
-import br.com.compass.model.AuditLog;
+import br.com.compass.dao.AccountDAO;
+import br.com.compass.dao.UserDAO;
+import br.com.compass.model.Account;
 import br.com.compass.model.Client;
 import br.com.compass.model.Manager;
-import br.com.compass.services.AuthService;
+// import br.com.compass.services.AuthService;
 
 public class App {
+    private static UserDAO userDAO = new UserDAO();
+    // private static AuthService authService = new AuthService(userDAO);
 
     public static void main(String[] args) {
-    	ArrayList<AuditLog> auditLog = new ArrayList<>();
-    	br.com.compass.config.DataSeeder.seed();
+        // br.com.compass.config.DataSeeder.seed();
         Scanner scanner = new Scanner(System.in);
         mainMenu(scanner);
         scanner.close();
@@ -23,14 +26,21 @@ public class App {
         boolean running = true;
 
         while (running) {
-            System.out.println("========= Main Menu =========");
-            System.out.println("|| 1. Login                ||");
-            System.out.println("|| 2. Account Opening      ||");
-            System.out.println("|| 0. Exit                 ||");
-            System.out.println("=============================");
-            System.out.print("Choose an option: ");
+            System.out.println("\n========= MAIN MENU =========");
+            System.out.println("1. Login");
+            System.out.println("2. Open New Account");
+            System.out.println("0. Exit");
+            System.out.println("============================");
+            System.out.print("Select an option: ");
 
-            int option = scanner.nextInt();
+            int option;
+            try {
+                option = scanner.nextInt();
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a number.");
+                scanner.nextLine();
+                continue;
+            }
             scanner.nextLine();
 
             switch (option) {
@@ -38,8 +48,8 @@ public class App {
                     loginMenu(scanner);
                     break;
                 case 2:
-                    System.out.println(">> Account Opening.");
-                    // TODO: call account creation logic here
+                    System.out.println("\n>> Account Opening");
+                    // TODO: account creation logic
                     break;
                 case 0:
                     running = false;
@@ -51,64 +61,103 @@ public class App {
     }
 
     public static void loginMenu(Scanner scanner) {
-        System.out.print(">> CPF: ");
+        System.out.print("\n>> Enter CPF: ");
         String cpf = scanner.nextLine();
 
-        System.out.print(">> Password: ");
-        String password = scanner.nextLine();
-
-        Object user = AuthService.login(cpf, password);
-
-        if (user == null) {
-            System.out.println("Login failed. Please check your credentials.");
+        // Verifica primeiro se é manager (não aplica bloqueio)
+        Manager manager = userDAO.findManagerByCpf(cpf);
+        if (manager != null) {
+            System.out.print(">> Enter password: ");
+            String password = scanner.nextLine();
+            
+            if (manager.validateLogin(password, manager.getPasswordSalt())) {
+                System.out.println("\nSuccessfully logged in as Manager.");
+                managerMenu(scanner, manager);
+            } else {
+                System.out.println("Incorrect password for manager.");
+            }
             return;
         }
 
-        if (user instanceof Manager) {
-            System.out.println("Login successful as Manager.");
-            managerMenu(scanner);
-        } else if (user instanceof Client) {
-            Client client = (Client) user;
+        // Se não for manager, verifica como client
+        Client client = userDAO.findClientByCpf(cpf);
+        if (client == null) {
+            System.out.println("CPF not registered in the system.");
+            return;
+        }
 
+        // Verifica se conta está bloqueada
+        if (client.getBlocked()) {
+            System.out.println("\nACCOUNT BLOCKED: Too many failed attempts");
+            System.out.println("Please contact a manager to unlock your account.");
+            return;
+        }
+        System.out.println(client.getLoginAttempts());
+        System.out.println(client.getBlocked());
+        System.out.print(">> Enter password: ");
+        String password = scanner.nextLine();
+
+        if (client.validateLogin(password, client.getPasswordSalt()) && client.getLoginAttempts() < 3) {
+            client.resetLoginAttempts();
+            userDAO.update(client);
+            System.out.println("\nSuccessfully logged in as Client.");
+            clientMenu(scanner, client);
+        } else {
+            client.incrementLoginAttempts();
+            userDAO.update(client);
+            
             if (client.getLoginAttempts() >= 3) {
-                System.out.println("Your account is blocked due to too many failed login attempts.");
+                System.out.println("\nACCOUNT BLOCKED: 3 failed attempts");
+                System.out.println("Contact a manager to unlock your account.");
             } else {
-                System.out.println("Login successful as Client.");
-                clientMenu(scanner);
+                System.out.println("\nIncorrect password. Attempts: " + 
+                    client.getLoginAttempts() + "/3");
             }
         }
     }
 
-    public static void managerMenu(Scanner scanner) {
+    public static void managerMenu(Scanner scanner, Manager manager) {
         boolean running = true;
         while (running) {
-            System.out.println(" ======= Manager Menu =======");
-            System.out.println("|| 1. Create Manager       ||");
-            System.out.println("|| 2. Unblock Account      ||");
-            System.out.println("|| 2. Review Reversal Req  ||");
-            System.out.println("|| 3. Review Inactivation  ||");
-            System.out.println("|| 0. Exit                 ||");
-            System.out.println(" ============================");
-            System.out.print("Choose an option: ");
+            System.out.println("\n======= MANAGER MENU =======");
+            System.out.println("1. Register New Manager");
+            System.out.println("2. Unlock Client Account");
+            System.out.println("3. Review Reversal Requests");
+            System.out.println("4. Review Account Closures");
+            System.out.println("0. Logout");
+            System.out.println("============================");
+            System.out.print("Select an option: ");
 
-            int option = scanner.nextInt();
+            int option;
+            try {
+                option = scanner.nextInt();
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a number.");
+                scanner.nextLine();
+                continue;
+            }
             scanner.nextLine();
 
             switch (option) {
                 case 1:
-                    System.out.println(">> Creating new manager...");
-                    // TODO: logic to create a manager
+                    System.out.println("\n>> Manager Registration");
+                    // TODO
                     break;
                 case 2:
-                    System.out.println(">> Listing Reversal Requests...");
-                    // TODO: list reversal requests and approve/reject
+                    System.out.println("\n>> Unlocking Accounts");
+                    // TODO
                     break;
                 case 3:
-                    System.out.println(">> Listing Account Inactivation Requests...");
-                    // TODO: list inactivation requests and approve/reject
+                    System.out.println("\n>> Reversal Requests");
+                    // TODO
+                    break;
+                case 4:
+                    System.out.println("\n>> Account Closure Requests");
+                    // TODO
                     break;
                 case 0:
                     running = false;
+                    System.out.println("Logging out...");
                     break;
                 default:
                     System.out.println("Invalid option.");
@@ -116,87 +165,112 @@ public class App {
         }
     }
 
-    public static void clientMenu(Scanner scanner) {
+    public static void clientMenu(Scanner scanner, Client client) {
+        AccountDAO accountDAO = new AccountDAO();
         boolean choosing = true;
 
         while (choosing) {
-            System.out.println(">> List of your accounts:");
-            // TODO: Load user's accounts
-            System.out.println("1. Account 1234");
-            System.out.println("2. Account 5678");
-            System.out.println("0. Exit");
-            System.out.print("Choose account: ");
-            int accountChoice = scanner.nextInt();
+            List<Account> accounts = accountDAO.findActiveAccountsByClient(client);
+
+            System.out.println("\n>> Your Active Accounts:");
+            if (accounts.isEmpty()) {
+                System.out.println("You don't have any active accounts.");
+                return;
+            }
+
+            for (int i = 0; i < accounts.size(); i++) {
+                Account acc = accounts.get(i);
+                System.out.printf("%d. Account #%d | Balance: $%.2f%n", 
+                    (i + 1), acc.getId(), acc.getBalance());
+            }
+            System.out.println("0. Back");
+            System.out.print("Select account: ");
+
+            int accountChoice;
+            try {
+                accountChoice = scanner.nextInt();
+            } catch (Exception e) {
+                System.out.println("Invalid input.");
+                scanner.nextLine();
+                continue;
+            }
             scanner.nextLine();
 
             if (accountChoice == 0) {
                 choosing = false;
+            } else if (accountChoice > 0 && accountChoice <= accounts.size()) {
+                Account selectedAccount = accounts.get(accountChoice - 1);
+                clientAccountMenu(scanner, client, selectedAccount);
             } else {
-                // TODO: Validate chosen account
-                clientAccountMenu(scanner, accountChoice);
+                System.out.println("Invalid selection. Please try again.");
             }
         }
     }
 
-    public static void clientAccountMenu(Scanner scanner, int accountId) {
+    public static void clientAccountMenu(Scanner scanner, Client client, Account account) {
         boolean running = true;
 
         while (running) {
-            System.out.println("====== Account Menu ======");
-            System.out.println("|| 1. View Balance       ||");
-            System.out.println("|| 2. Deposit            ||");
-            System.out.println("|| 3. Withdraw           ||");
-            System.out.println("|| 4. Transfer           ||");
-            System.out.println("|| 5. Request Reversal   ||");
-            System.out.println("|| 6. Request Inactivation ||");
-            System.out.println("|| 0. Back               ||");
-            System.out.println("==========================");
-            System.out.print("Choose an option: ");
+            System.out.println("\n======= ACCOUNT MENU =======");
+            System.out.println("1. Check Balance");
+            System.out.println("2. Make Deposit");
+            System.out.println("3. Make Withdrawal");
+            System.out.println("4. Transfer Funds");
+            System.out.println("5. Request Transaction Reversal");
+            System.out.println("6. Request Account Closure");
+            System.out.println("0. Back to Accounts");
+            System.out.println("============================");
+            System.out.print("Select an option: ");
 
-            int option = scanner.nextInt();
+            int option;
+            try {
+                option = scanner.nextInt();
+            } catch (Exception e) {
+                System.out.println("Invalid input.");
+                scanner.nextLine();
+                continue;
+            }
             scanner.nextLine();
 
             switch (option) {
                 case 1:
-                    System.out.println(">> Your current balance is: ...");
-                    // TODO: print balance using service
+                    System.out.printf("\nCurrent balance: $%.2f%n", account.getBalance());
                     break;
                 case 2:
-                    System.out.print(">> Amount to deposit: ");
+                    System.out.print("Enter deposit amount: $");
                     double depositAmount = scanner.nextDouble();
                     scanner.nextLine();
-                    // TODO: perform deposit
-                    System.out.println(">> Deposited " + depositAmount);
+                    // TODO: deposit logic
+                    System.out.printf("$%.2f deposited successfully.%n", depositAmount);
                     break;
                 case 3:
-                    System.out.print(">> Amount to withdraw: ");
+                    System.out.print("Enter withdrawal amount: $");
                     double withdrawAmount = scanner.nextDouble();
                     scanner.nextLine();
-                    // TODO: perform withdrawal
-                    System.out.println(">> Withdrawn " + withdrawAmount);
+                    // TODO: withdraw logic
+                    System.out.printf("$%.2f withdrawn successfully.%n", withdrawAmount);
                     break;
                 case 4:
-                    System.out.print(">> Enter destination account number: ");
+                    System.out.print("Recipient account number: ");
                     String destAccount = scanner.nextLine();
-                    System.out.print(">> Enter amount: ");
+                    System.out.print("Transfer amount: $");
                     double transferAmount = scanner.nextDouble();
                     scanner.nextLine();
-                    // TODO: perform transfer
-                    System.out.println(">> Transferred " + transferAmount + " to " + destAccount);
+                    // TODO: transfer logic
+                    System.out.printf("Transferred $%.2f to account %s%n", transferAmount, destAccount);
                     break;
                 case 5:
                     reversalRequestMenu(scanner);
                     break;
                 case 6:
-                    System.out.println(">> Are you sure you want to request account inactivation? (Y/N)");
+                    System.out.print("Are you sure you want to close this account? (Y/N): ");
                     String confirm = scanner.nextLine();
                     if (confirm.equalsIgnoreCase("Y")) {
-                        // TODO: request inactivation
-                        System.out.println(">> Inactivation request submitted.");
+                        // TODO: closure logic
+                        System.out.println("Account closure request submitted.");
                         return;
-                    } else {
-                        System.out.println(">> Canceled.");
                     }
+                    System.out.println("Operation cancelled.");
                     break;
                 case 0:
                     running = false;
@@ -208,37 +282,49 @@ public class App {
     }
 
     public static void reversalRequestMenu(Scanner scanner) {
-        System.out.println("Select the type of operation to reverse:");
+        System.out.println("\nSelect transaction type to reverse:");
         System.out.println("1. Deposits");
         System.out.println("2. Withdrawals");
-        System.out.println("3. Transfers Sent");
-        System.out.println("4. Transfers Received");
+        System.out.println("3. Outgoing Transfers");
+        System.out.println("4. Incoming Transfers");
         System.out.println("0. Cancel");
-        System.out.print("Your choice: ");
+        System.out.print("Your selection: ");
 
-        int choice = scanner.nextInt();
-        scanner.nextLine();
-
-        if (choice == 0) {
+        int choice;
+        try {
+            choice = scanner.nextInt();
+        } catch (Exception e) {
+            System.out.println("Invalid input.");
+            scanner.nextLine();
             return;
         }
+        scanner.nextLine();
 
-        // TODO: Load and display corresponding transactions
-        System.out.println(">> Displaying transactions...");
-        System.out.println("1. Transaction #111 - R$200");
-        System.out.println("2. Transaction #222 - R$500");
-        System.out.println("0. Cancel");
+        if (choice == 0) return;
 
-        System.out.print("Select transaction to reverse: ");
-        int txChoice = scanner.nextInt();
+        // TODO: Load and display transactions
+        System.out.println("\nRecent transactions:");
+        System.out.println("1. TXN#111 - $200.00");
+        System.out.println("2. TXN#222 - $500.00");
+        System.out.println("0. Back");
+
+        System.out.print("Select transaction: ");
+        int txChoice;
+        try {
+            txChoice = scanner.nextInt();
+        } catch (Exception e) {
+            System.out.println("Invalid input.");
+            scanner.nextLine();
+            return;
+        }
         scanner.nextLine();
 
         if (txChoice == 0) return;
 
-        System.out.print("Enter reason for reversal: ");
-        String reason = scanner.nextLine();
+        System.out.print("Reason for reversal: ");
+        // String reason = scanner.nextLine();
 
-        // TODO: submit reversal request
-        System.out.println(">> Reversal request submitted with reason: " + reason);
+        // TODO: submit request
+        System.out.println("Reversal request submitted. Reference: R" + System.currentTimeMillis());
     }
 }

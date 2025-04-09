@@ -83,4 +83,15 @@ public class AuditLog {
 		this.affectedAccount = affectedAccount;
 	}
 
+	public AuditLog(String actionType, String details, LocalDateTime timestamp, User actor, Account affectedAccount) {
+		super();
+		this.actionType = actionType;
+		this.details = details;
+		this.timestamp = timestamp;
+		this.actor = actor;
+		this.affectedAccount = affectedAccount;
+	}
+	
+	public AuditLog() {}
+
 }

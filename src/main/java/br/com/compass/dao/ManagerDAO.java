@@ -8,14 +8,39 @@ import jakarta.persistence.TypedQuery;
 
 public class ManagerDAO {
 
-    public Manager findByCpf(String cpf) {
+	public Manager findByCpf(String cpf) {
         EntityManager em = JpaConfig.getEntityManager();
         try {
-            TypedQuery<Manager> query = em.createQuery("SELECT m FROM Manager m WHERE m.cpf = :cpf", Manager.class);
+            TypedQuery<Manager> query = em.createQuery(
+                "SELECT m FROM Manager m WHERE m.cpf = :cpf", Manager.class);
             query.setParameter("cpf", cpf);
             return query.getSingleResult();
         } catch (NoResultException e) {
             return null;
+        } finally {
+            em.close();
+        }
+    }
+
+    public boolean existsByCpf(String cpf) {
+        EntityManager em = JpaConfig.getEntityManager();
+        try {
+            TypedQuery<Long> query = em.createQuery(
+                "SELECT COUNT(m) FROM Manager m WHERE m.cpf = :cpf", Long.class);
+            query.setParameter("cpf", cpf);
+            return query.getSingleResult() > 0;
+        } finally {
+            em.close();
+        }
+    }
+
+    public boolean existsClientWithSameCpf(String cpf) {
+        EntityManager em = JpaConfig.getEntityManager();
+        try {
+            TypedQuery<Long> query = em.createQuery(
+                "SELECT COUNT(c) FROM Client c WHERE c.cpf = :cpf", Long.class);
+            query.setParameter("cpf", cpf);
+            return query.getSingleResult() > 0;
         } finally {
             em.close();
         }

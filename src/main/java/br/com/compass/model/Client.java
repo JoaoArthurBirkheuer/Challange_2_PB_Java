@@ -13,5 +13,9 @@ public class Client extends User {
 	public List<Account> getAccounts() {
 		return accounts;
 	}
+
+	public boolean isBlocked() {
+		return getBlocked() != null && getBlocked();
+	}
 	
 }

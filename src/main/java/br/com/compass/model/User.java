@@ -3,6 +3,7 @@ package br.com.compass.model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import br.com.compass.utils.PasswordHasher;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -24,7 +25,7 @@ public abstract class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false, length = 14)
+    @Column(nullable = false, length = 14)
     private String cpf;
     
     @Column(nullable = false)
@@ -61,8 +62,8 @@ public abstract class User {
         this.loginAttempts = 0;
     }
 
-    public boolean validateLogin(String passwordHashAttempt) {
-        return this.passwordHash.equals(passwordHashAttempt);
+    public boolean validateLogin(String passwordHashAttempt, byte[] salt) {
+        return PasswordHasher.verifyPassword(passwordHashAttempt, this.passwordHash, salt);
     }
 
 	public Long getId() {
