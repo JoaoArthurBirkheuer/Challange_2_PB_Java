@@ -16,7 +16,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "accounts", indexes = {
+@Table(name = "tb_accounts", indexes = {
     @Index(name = "idx_account_email", columnList = "email"),
     @Index(name = "idx_account_account_number", columnList = "accountNumber")
 })
@@ -100,8 +100,5 @@ public class Account {
 	public void setOwner(Client owner) {
 		this.owner = owner;
 	}
-
-    // Relacionamentos com transações (depois implementamos)
-
     
 }

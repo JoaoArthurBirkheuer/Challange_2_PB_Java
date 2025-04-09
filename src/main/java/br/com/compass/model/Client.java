@@ -13,4 +13,5 @@ public class Client extends User {
 	public List<Account> getAccounts() {
 		return accounts;
 	}
+	
 }

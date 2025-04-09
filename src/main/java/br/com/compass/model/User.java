@@ -1,7 +1,18 @@
 package br.com.compass.model;
 
-import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
+import jakarta.persistence.Lob;
+import jakarta.persistence.Table;
 
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -15,6 +26,12 @@ public abstract class User {
 
     @Column(unique = true, nullable = false, length = 14)
     private String cpf;
+    
+    @Column(nullable = false)
+    private LocalDate birthDate;
+    
+    @Column(nullable = false)
+    private String cellphoneNumber;
 
     @Column(nullable = false)
     private String name;
@@ -31,8 +48,9 @@ public abstract class User {
     @Column(nullable = false)
     private Boolean blocked = false;
     
+    @Lob
     @Column(nullable = false)
-    private Boolean inactive = false;
+    private byte[] passwordSalt;
 
     public void incrementLoginAttempts() {
         this.loginAttempts++;
@@ -103,11 +121,28 @@ public abstract class User {
 		this.blocked = blocked;
 	}
 
-	public Boolean getInactive() {
-		return inactive;
+	public LocalDate getBirthDate() {
+		return birthDate;
 	}
 
-	public void setInactive(Boolean inactive) {
-		this.inactive = inactive;
+	public void setBirthDate(LocalDate birthDate) {
+		this.birthDate = birthDate;
 	}
+
+	public String getCellphoneNumber() {
+		return cellphoneNumber;
+	}
+
+	public void setCellphoneNumber(String cellphoneNumber) {
+		this.cellphoneNumber = cellphoneNumber;
+	}
+
+	public byte[] getPasswordSalt() {
+		return passwordSalt;
+	}
+
+	public void setPasswordSalt(byte[] passwordSalt) {
+		this.passwordSalt = passwordSalt;
+	}
+
 }

@@ -1,10 +1,18 @@
 package br.com.compass;
 
+import java.util.ArrayList;
 import java.util.Scanner;
+
+import br.com.compass.model.AuditLog;
+import br.com.compass.model.Client;
+import br.com.compass.model.Manager;
+import br.com.compass.services.AuthService;
 
 public class App {
 
     public static void main(String[] args) {
+    	ArrayList<AuditLog> auditLog = new ArrayList<>();
+    	br.com.compass.config.DataSeeder.seed();
         Scanner scanner = new Scanner(System.in);
         mainMenu(scanner);
         scanner.close();
@@ -43,48 +51,44 @@ public class App {
     }
 
     public static void loginMenu(Scanner scanner) {
-        System.out.println(">> CPF: ");
+        System.out.print(">> CPF: ");
         String cpf = scanner.nextLine();
 
-        System.out.println(">> Password: ");
+        System.out.print(">> Password: ");
         String password = scanner.nextLine();
 
-        // TODO: Validate CPF and password with AuthService
+        Object user = AuthService.login(cpf, password);
 
-        boolean isManager = false;  // Replace with actual check
-        boolean isClient = true;    // Replace with actual check
-
-        if (!isManager && !isClient) {
-            System.out.println("No user found with given CPF.");
+        if (user == null) {
+            System.out.println("Login failed. Please check your credentials.");
             return;
         }
 
-        if (isManager && isClient) {
-            System.out.println("CPF belongs to both roles. Enter 'M' for Manager or 'C' for Client:");
-            String choice = scanner.nextLine().toUpperCase();
-            if (choice.equals("M")) {
-                managerMenu(scanner);
-            } else if (choice.equals("C")) {
-                clientMenu(scanner);
-            } else {
-                System.out.println("Invalid role choice.");
-            }
-        } else if (isManager) {
+        if (user instanceof Manager) {
+            System.out.println("Login successful as Manager.");
             managerMenu(scanner);
-        } else if (isClient) {
-            clientMenu(scanner);
+        } else if (user instanceof Client) {
+            Client client = (Client) user;
+
+            if (client.getLoginAttempts() >= 3) {
+                System.out.println("Your account is blocked due to too many failed login attempts.");
+            } else {
+                System.out.println("Login successful as Client.");
+                clientMenu(scanner);
+            }
         }
     }
 
     public static void managerMenu(Scanner scanner) {
         boolean running = true;
         while (running) {
-            System.out.println("======= Manager Menu =======");
+            System.out.println(" ======= Manager Menu =======");
             System.out.println("|| 1. Create Manager       ||");
-            System.out.println("|| 2. Review Reversal Req ||");
-            System.out.println("|| 3. Review Inactivation ||");
-            System.out.println("|| 0. Exit                ||");
-            System.out.println("============================");
+            System.out.println("|| 2. Unblock Account      ||");
+            System.out.println("|| 2. Review Reversal Req  ||");
+            System.out.println("|| 3. Review Inactivation  ||");
+            System.out.println("|| 0. Exit                 ||");
+            System.out.println(" ============================");
             System.out.print("Choose an option: ");
 
             int option = scanner.nextInt();
