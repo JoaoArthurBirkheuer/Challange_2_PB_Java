@@ -88,4 +88,19 @@ public class ManagerDAO {
             em.close();
         }
     }
+
+	public void createManager(Manager newManager) {
+		EntityManager em = JpaConfig.getEntityManager();
+        try {
+        	em.getTransaction().begin();
+            em.persist(newManager);
+            em.getTransaction().commit();
+            // System.out.println("Client registered successfully!");
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw new RuntimeException("Failed to register client: " + e.getMessage(), e);
+        } finally {
+            em.close();
+        }
+	}
 }

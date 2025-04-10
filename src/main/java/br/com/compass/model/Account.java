@@ -1,7 +1,6 @@
 package br.com.compass.model;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 
 import br.com.compass.model.enums.AccountType;
 import jakarta.persistence.Column;
@@ -29,7 +28,7 @@ public class Account {
     private String accountNumber;
 
     @Column(nullable = false)
-    private BigDecimal balance = BigDecimal.ZERO;
+    private Double balance;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -37,12 +36,13 @@ public class Account {
 
     @Column(nullable = false)
     private Boolean active = true;
+    
+    @Column(nullable = false)
+    private Boolean closureRequested = false;
 
     @ManyToOne
     @JoinColumn(name = "client_id", nullable = false)
     private Client owner;
-    
-    private ArrayList<String> history = new ArrayList<>();
 
 	public Long getId() {
 		return id;
@@ -60,11 +60,11 @@ public class Account {
 		this.accountNumber = accountNumber;
 	}
 
-	public BigDecimal getBalance() {
+	public Double getBalance() {
 		return balance;
 	}
 
-	public void setBalance(BigDecimal balance) {
+	public void setBalance(Double balance) {
 		this.balance = balance;
 	}
 
@@ -91,5 +91,14 @@ public class Account {
 	public void setOwner(Client owner) {
 		this.owner = owner;
 	}
+
+	public Boolean getClosureRequested() {
+		return closureRequested;
+	}
+
+	public void setClosureRequested(Boolean closureRequested) {
+		this.closureRequested = closureRequested;
+	}
     
+	
 }

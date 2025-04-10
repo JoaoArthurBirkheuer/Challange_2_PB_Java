@@ -1,4 +1,4 @@
-package br.com.compass.report;
+package br.com.compass.utils;
 
 public class CsvReportExporter {
 

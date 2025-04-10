@@ -1,6 +1,7 @@
 package br.com.compass.dao;
 
 import java.util.List;
+import java.util.Optional;
 
 import br.com.compass.config.JpaConfig;
 import br.com.compass.model.Account;
@@ -56,5 +57,14 @@ public class AccountDAO {
             if (tx.isActive()) tx.rollback();
             throw e;
         }
+    }
+
+    public Optional<Account> findByAccountNumber(String accountNumber) {
+        String jpql = "SELECT a FROM Account a WHERE a.accountNumber = :accountNumber";
+        TypedQuery<Account> query = em.createQuery(jpql, Account.class);
+        query.setParameter("accountNumber", accountNumber);
+
+        List<Account> resultList = query.getResultList();
+        return resultList.isEmpty() ? Optional.empty() : Optional.of(resultList.get(0));
     }
 }

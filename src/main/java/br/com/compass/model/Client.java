@@ -1,14 +1,19 @@
 package br.com.compass.model;
 
-import jakarta.persistence.*;
+import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "tb_clients")
 public class Client extends User {
 
-    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Account> accounts;
+	@OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Account> accounts =  new ArrayList<>();
 
 	public List<Account> getAccounts() {
 		return accounts;
@@ -18,4 +23,8 @@ public class Client extends User {
 		return getBlocked() != null && getBlocked();
 	}
 	
+	private void addAccount(Account account) {
+		    account.setOwner(this);
+		    accounts.add(account);
+	}
 }

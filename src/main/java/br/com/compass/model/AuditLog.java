@@ -27,7 +27,7 @@ public class AuditLog {
     @Column(nullable = false)
     private LocalDateTime timestamp = LocalDateTime.now();
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = true)
     @JoinColumn(name = "user_id")
     private User actor;
 

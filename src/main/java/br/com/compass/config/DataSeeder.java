@@ -1,6 +1,6 @@
 package br.com.compass.config;
 
-import java.math.BigDecimal;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Random;
@@ -140,7 +140,7 @@ public class DataSeeder {
         Account account = new Account();
         account.setOwner(owner);
         account.setType(type);
-        account.setBalance(new BigDecimal(initialBalance));
+        account.setBalance(Double.parseDouble(initialBalance));
         account.setActive(true);
         account.setAccountNumber(generateAccountNumber());
         return account;

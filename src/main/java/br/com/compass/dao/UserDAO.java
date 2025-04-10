@@ -91,4 +91,13 @@ public class UserDAO {
             em.close();
         }
     }
+    
+    public User findById(Long id) {
+        EntityManager em = JpaConfig.getEntityManager();
+        try {
+            return em.find(User.class, id);
+        } finally {
+            em.close();
+        }
+    }
 }
