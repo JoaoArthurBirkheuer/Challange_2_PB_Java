@@ -3,6 +3,7 @@ package br.com.compass.dao;
 import br.com.compass.config.JpaConfig;
 import br.com.compass.model.Client;
 import jakarta.persistence.EntityManager;
+//import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
@@ -84,6 +85,21 @@ public class ClientDAO {
         } catch (Exception e) {
             em.getTransaction().rollback();
             throw new RuntimeException("Failed to delete client: " + e.getMessage(), e);
+        } finally {
+            em.close();
+        }
+    }
+    
+    public void createClient(Client client) {
+    	 EntityManager em = JpaConfig.getEntityManager();
+        try {
+        	em.getTransaction().begin();
+            em.persist(client);
+            em.getTransaction().commit();
+            // System.out.println("Client registered successfully!");
+        } catch (Exception e) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            throw new RuntimeException("Failed to register client: " + e.getMessage(), e);
         } finally {
             em.close();
         }

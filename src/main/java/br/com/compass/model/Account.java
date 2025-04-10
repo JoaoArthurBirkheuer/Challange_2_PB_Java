@@ -1,6 +1,7 @@
 package br.com.compass.model;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 
 import br.com.compass.model.enums.AccountType;
 import jakarta.persistence.Column;
@@ -17,7 +18,6 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "tb_accounts", indexes = {
-    @Index(name = "idx_account_email", columnList = "email"),
     @Index(name = "idx_account_account_number", columnList = "accountNumber")
 })
 public class Account {
@@ -31,9 +31,6 @@ public class Account {
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 
-    @Column(nullable = false)
-    private String email;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AccountType type;
@@ -44,6 +41,8 @@ public class Account {
     @ManyToOne
     @JoinColumn(name = "client_id", nullable = false)
     private Client owner;
+    
+    private ArrayList<String> history = new ArrayList<>();
 
 	public Long getId() {
 		return id;
@@ -67,14 +66,6 @@ public class Account {
 
 	public void setBalance(BigDecimal balance) {
 		this.balance = balance;
-	}
-
-	public String getEmail() {
-		return email;
-	}
-
-	public void setEmail(String email) {
-		this.email = email;
 	}
 
 	public AccountType getType() {
