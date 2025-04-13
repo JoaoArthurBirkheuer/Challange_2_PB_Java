@@ -1,6 +1,5 @@
 package br.com.compass.model;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import br.com.compass.model.enums.TransactionType;
@@ -23,7 +22,7 @@ public class Transaction {
     private Long id;
 
     @Column(nullable = false)
-    private BigDecimal amount;
+    private Double amount;
 
     @Column(nullable = false)
     private LocalDateTime timestamp = LocalDateTime.now();
@@ -55,11 +54,11 @@ public class Transaction {
 		this.id = id;
 	}
 
-	public BigDecimal getAmount() {
+	public Double getAmount() {
 		return amount;
 	}
 
-	public void setAmount(BigDecimal amount) {
+	public void setAmount(Double amount) {
 		this.amount = amount;
 	}
 
@@ -102,5 +101,7 @@ public class Transaction {
 	public void setIsReversible(Boolean isReversible) {
 		this.isReversible = isReversible;
 	}
+	
+	
 
 }

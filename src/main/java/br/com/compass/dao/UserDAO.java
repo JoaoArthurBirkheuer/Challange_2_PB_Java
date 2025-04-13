@@ -11,34 +11,45 @@ import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
-public class UserDAO {
+public class UserDAO implements AutoCloseable {
+    
+    private EntityManager em;
+    private boolean isClosed = false;
+    
+    public UserDAO() {
+        this.em = JpaConfig.getEntityManager();
+    }
+
+    public boolean isOpen() {
+        return em != null && em.isOpen() && !isClosed;
+    }
 
     public List<User> findAllByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
+        checkOpen();
         try {
             TypedQuery<User> query = em.createQuery(
                 "SELECT u FROM User u WHERE u.cpf = :cpf", User.class);
             query.setParameter("cpf", cpf);
             return query.getResultList();
-        } finally {
-            em.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to find users by CPF: " + cpf, e);
         }
     }
 
     public int countUsersByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
+        checkOpen();
         try {
             TypedQuery<Long> query = em.createQuery(
                 "SELECT COUNT(u) FROM User u WHERE u.cpf = :cpf", Long.class);
             query.setParameter("cpf", cpf);
             return query.getSingleResult().intValue();
-        } finally {
-            em.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to count users by CPF: " + cpf, e);
         }
     }
     
     public Client findClientByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
+        checkOpen();
         try {
             TypedQuery<Client> query = em.createQuery(
                 "SELECT c FROM Client c WHERE c.cpf = :cpf", Client.class);
@@ -46,13 +57,13 @@ public class UserDAO {
             return query.getSingleResult();
         } catch (NoResultException e) {
             return null;
-        } finally {
-            em.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to find client by CPF: " + cpf, e);
         }
     }
 
     public Manager findManagerByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
+        checkOpen();
         try {
             TypedQuery<Manager> query = em.createQuery(
                 "SELECT m FROM Manager m WHERE m.cpf = :cpf", Manager.class);
@@ -60,13 +71,13 @@ public class UserDAO {
             return query.getSingleResult();
         } catch (NoResultException e) {
             return null;
-        } finally {
-            em.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to find manager by CPF: " + cpf, e);
         }
     }
     
     public void update(User user) {
-        EntityManager em = JpaConfig.getEntityManager();
+        checkOpen();
         EntityTransaction tx = null;
         
         try {
@@ -87,17 +98,32 @@ public class UserDAO {
                 tx.rollback();
             }
             throw new RuntimeException("Failed to update user: " + e.getMessage(), e);
-        } finally {
-            em.close();
         }
     }
     
     public User findById(Long id) {
-        EntityManager em = JpaConfig.getEntityManager();
+        checkOpen();
         try {
             return em.find(User.class, id);
-        } finally {
-            em.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to find user by ID: " + id, e);
+        }
+    }
+
+    @Override
+    public void close() {
+        if (isOpen()) {
+            try {
+                em.close();
+            } finally {
+                isClosed = true;
+            }
+        }
+    }
+
+    private void checkOpen() {
+        if (!isOpen()) {
+            throw new IllegalStateException("EntityManager is closed");
         }
     }
 }

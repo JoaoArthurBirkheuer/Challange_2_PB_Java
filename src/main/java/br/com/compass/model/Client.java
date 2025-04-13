@@ -23,8 +23,4 @@ public class Client extends User {
 		return getBlocked() != null && getBlocked();
 	}
 	
-	private void addAccount(Account account) {
-		    account.setOwner(this);
-		    accounts.add(account);
-	}
 }

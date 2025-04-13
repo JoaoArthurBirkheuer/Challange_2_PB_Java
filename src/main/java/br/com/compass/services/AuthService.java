@@ -2,15 +2,22 @@ package br.com.compass.services;
 
 import br.com.compass.dao.UserDAO;
 import br.com.compass.model.Client;
-// import br.com.compass.model.Manager;
 import br.com.compass.model.User;
-// import br.com.compass.utils.PasswordHasher;
 
-public class AuthService {
+public class AuthService implements AutoCloseable {
     private final UserDAO userDAO;
+    private final boolean ownsUserDAO;
     
+    // Constructor for external DAO management
     public AuthService(UserDAO userDAO) {
         this.userDAO = userDAO;
+        this.ownsUserDAO = false;
+    }
+    
+    // Constructor for internal DAO management
+    public AuthService() {
+        this.userDAO = new UserDAO();
+        this.ownsUserDAO = true;
     }
 
     public enum LoginType {
@@ -18,13 +25,17 @@ public class AuthService {
     }
 
     public LoginType checkLoginType(String cpf) {
-        boolean isClient = userDAO.findClientByCpf(cpf) != null;
-        boolean isManager = userDAO.findManagerByCpf(cpf) != null;
-        
-        if (isClient && isManager) return LoginType.BOTH;
-        if (isClient) return LoginType.CLIENT_ONLY;
-        if (isManager) return LoginType.MANAGER_ONLY;
-        return null;
+        try {
+            boolean isClient = userDAO.findClientByCpf(cpf) != null;
+            boolean isManager = userDAO.findManagerByCpf(cpf) != null;
+            
+            if (isClient && isManager) return LoginType.BOTH;
+            if (isClient) return LoginType.CLIENT_ONLY;
+            if (isManager) return LoginType.MANAGER_ONLY;
+            return null;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to check login type", e);
+        }
     }
 
     public User login(String cpf, String password, LoginType loginType) {
@@ -44,13 +55,24 @@ public class AuthService {
             
             if (user != null && user.validateLogin(password, user.getPasswordSalt())) {
                 if (user instanceof Client && ((Client) user).isBlocked()) {
-                    return null; // Cliente bloqueado
+                    return null; // Blocked client
                 }
                 return user;
             }
             return null;
         } catch (Exception e) {
             throw new RuntimeException("Login failed", e);
+        }
+    }
+
+    @Override
+    public void close() {
+        if (ownsUserDAO && userDAO != null) {
+            try {
+                userDAO.close();
+            } catch (Exception e) {
+                System.err.println("Error while closing UserDAO in AuthService: " + e.getMessage());
+            }
         }
     }
 }

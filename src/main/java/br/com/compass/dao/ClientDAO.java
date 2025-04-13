@@ -1,16 +1,28 @@
 package br.com.compass.dao;
 
+import java.util.List;
+
 import br.com.compass.config.JpaConfig;
 import br.com.compass.model.Client;
 import jakarta.persistence.EntityManager;
-//import jakarta.persistence.EntityTransaction;
+import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
-public class ClientDAO {
+public class ClientDAO implements AutoCloseable {
+    
+    private final EntityManager em;
+    
+    public ClientDAO() {
+        this.em = JpaConfig.getEntityManager();
+    }
 
-	public Client findByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
+    // Add this method to begin transactions
+    public EntityTransaction beginTransaction() {
+        return em.getTransaction();
+    }
+
+    public Client findByCpf(String cpf) {
         try {
             TypedQuery<Client> query = em.createQuery(
                 "SELECT c FROM Client c WHERE c.cpf = :cpf", Client.class);
@@ -18,90 +30,99 @@ public class ClientDAO {
             return query.getSingleResult();
         } catch (NoResultException e) {
             return null;
-        } finally {
-            em.close();
         }
+    }
+    
+    public Client findById(Long id) {
+        try {
+            TypedQuery<Client> query = em.createQuery(
+                "SELECT c FROM Client c WHERE c.id = :id", Client.class);
+            query.setParameter("id", id);
+            return query.getSingleResult();
+        } catch (NoResultException e) {
+            return null;
+        }
+    }
+    
+    public List<Client> findBlockedClients() {
+        TypedQuery<Client> query = em.createQuery(
+            "SELECT c FROM Client c WHERE c.blocked = true", Client.class);
+        return query.getResultList();
     }
 
     public boolean existsByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
-        try {
-            TypedQuery<Long> query = em.createQuery(
-                "SELECT COUNT(c) FROM Client c WHERE c.cpf = :cpf", Long.class);
-            query.setParameter("cpf", cpf);
-            return query.getSingleResult() > 0;
-        } finally {
-            em.close();
-        }
+        TypedQuery<Long> query = em.createQuery(
+            "SELECT COUNT(c) FROM Client c WHERE c.cpf = :cpf", Long.class);
+        query.setParameter("cpf", cpf);
+        return query.getSingleResult() > 0;
     }
 
     public boolean existsManagerWithSameCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
-        try {
-            TypedQuery<Long> query = em.createQuery(
-                "SELECT COUNT(m) FROM Manager m WHERE m.cpf = :cpf", Long.class);
-            query.setParameter("cpf", cpf);
-            return query.getSingleResult() > 0;
-        } finally {
-            em.close();
-        }
+        TypedQuery<Long> query = em.createQuery(
+            "SELECT COUNT(m) FROM Manager m WHERE m.cpf = :cpf", Long.class);
+        query.setParameter("cpf", cpf);
+        return query.getSingleResult() > 0;
     }
 
     public void update(Client client) {
-        EntityManager em = JpaConfig.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
         try {
-            em.getTransaction().begin();
+            tx.begin();
             em.merge(client);
-            em.getTransaction().commit();
+            tx.commit();
         } catch (Exception e) {
-            em.getTransaction().rollback();
+            if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Failed to update client: " + e.getMessage(), e);
-        } finally {
-            em.close();
         }
     }
 
     public void save(Client client) {
-        EntityManager em = JpaConfig.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
         try {
-            em.getTransaction().begin();
+            tx.begin();
             em.persist(client);
-            em.getTransaction().commit();
+            tx.commit();
         } catch (Exception e) {
-            em.getTransaction().rollback();
+            if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Failed to save client: " + e.getMessage(), e);
-        } finally {
-            em.close();
         }
     }
 
     public void delete(Client client) {
-        EntityManager em = JpaConfig.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
         try {
-            em.getTransaction().begin();
+            tx.begin();
             Client managedClient = em.merge(client);
             em.remove(managedClient);
-            em.getTransaction().commit();
+            tx.commit();
         } catch (Exception e) {
-            em.getTransaction().rollback();
+            if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Failed to delete client: " + e.getMessage(), e);
-        } finally {
-            em.close();
         }
     }
     
     public void createClient(Client client) {
-    	 EntityManager em = JpaConfig.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
         try {
-        	em.getTransaction().begin();
+            tx.begin();
             em.persist(client);
-            em.getTransaction().commit();
-            // System.out.println("Client registered successfully!");
+            tx.commit();
         } catch (Exception e) {
-            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Failed to register client: " + e.getMessage(), e);
-        } finally {
-            em.close();
         }
     }
+
+    @Override
+    public void close() {
+        if (em != null && em.isOpen()) {
+            em.close();
+       }
+    }
+   
+
+	public EntityManager getEntityManager() {
+		// TODO Auto-generated method stub
+		return this.em;
+	}
 }

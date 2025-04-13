@@ -3,79 +3,59 @@ package br.com.compass.dao;
 import java.util.List;
 
 import br.com.compass.config.JpaConfig;
-import br.com.compass.model.Client;
-import br.com.compass.model.Manager;
 import br.com.compass.model.ReversalRequest;
+import br.com.compass.model.Transaction;
 import br.com.compass.model.enums.RequestStatus;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.TypedQuery;
+import jakarta.persistence.EntityTransaction;
 
-public class ReversalRequestDAO {
-
-    public void save(ReversalRequest request) {
-        EntityManager em = JpaConfig.getEntityManager();
-        try {
-            em.getTransaction().begin();
-            em.persist(request);
-            em.getTransaction().commit();
-        } finally {
-            em.close();
-        }
+public class ReversalRequestDAO implements AutoCloseable {
+    private final EntityManager em;
+    
+    public ReversalRequestDAO() {
+        this.em = JpaConfig.getEntityManager();
     }
-
-    public void update(ReversalRequest request) {
-        EntityManager em = JpaConfig.getEntityManager();
-        try {
-            em.getTransaction().begin();
-            em.merge(request);
-            em.getTransaction().commit();
-        } finally {
-            em.close();
-        }
-    }
-
-    public ReversalRequest findById(Long id) {
-        EntityManager em = JpaConfig.getEntityManager();
-        try {
-            return em.find(ReversalRequest.class, id);
-        } finally {
-            em.close();
-        }
+    
+    public ReversalRequestDAO(EntityManager em) {
+        this.em = em;
     }
 
     public List<ReversalRequest> findPendingRequests() {
-        EntityManager em = JpaConfig.getEntityManager();
+        return em.createQuery(
+            "SELECT r FROM ReversalRequest r WHERE r.status = :status", ReversalRequest.class)
+            .setParameter("status", RequestStatus.PENDING)
+            .getResultList();
+    }
+
+    public ReversalRequest findById(Long id) {
+        return em.find(ReversalRequest.class, id);
+    }
+
+    public void save(ReversalRequest request) {
+        EntityTransaction tx = em.getTransaction();
         try {
-            TypedQuery<ReversalRequest> query = em.createQuery(
-                "SELECT r FROM ReversalRequest r WHERE r.status = :status", ReversalRequest.class);
-            query.setParameter("status", RequestStatus.PENDING);
-            return query.getResultList();
-        } finally {
-            em.close();
+            tx.begin();
+            em.persist(request);
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Failed to save reversal request", e);
         }
     }
 
-    public List<ReversalRequest> findByClient(Client client) {
-        EntityManager em = JpaConfig.getEntityManager();
-        try {
-            TypedQuery<ReversalRequest> query = em.createQuery(
-                "SELECT r FROM ReversalRequest r WHERE r.requester = :client", ReversalRequest.class);
-            query.setParameter("client", client);
-            return query.getResultList();
-        } finally {
+    @Override
+    public void close() {
+        if (em != null && em.isOpen()) {
             em.close();
         }
     }
-
-    public List<ReversalRequest> findByManager(Manager manager) {
-        EntityManager em = JpaConfig.getEntityManager();
-        try {
-            TypedQuery<ReversalRequest> query = em.createQuery(
-                "SELECT r FROM ReversalRequest r WHERE r.resolver = :manager", ReversalRequest.class);
-            query.setParameter("manager", manager);
-            return query.getResultList();
-        } finally {
-            em.close();
-        }
+    
+    public boolean hasPendingReversalForTransaction(Transaction transaction) {
+        Long count = em.createQuery(
+            "SELECT COUNT(r) FROM ReversalRequest r " +
+            "WHERE r.transaction = :transaction AND r.status = 'PENDING'", Long.class)
+            .setParameter("transaction", transaction)
+            .getSingleResult();
+        return count > 0;
     }
 }

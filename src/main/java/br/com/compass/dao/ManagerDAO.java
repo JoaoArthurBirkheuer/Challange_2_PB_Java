@@ -3,13 +3,23 @@ package br.com.compass.dao;
 import br.com.compass.config.JpaConfig;
 import br.com.compass.model.Manager;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
-public class ManagerDAO {
+public class ManagerDAO implements AutoCloseable{
+	
+	private final EntityManager em;
+	
+	public ManagerDAO() {
+		this.em = JpaConfig.getEntityManager();
+	}
 
+	public EntityTransaction beginTransaction() {
+        return em.getTransaction();
+    }
 	public Manager findByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
+       
         try {
             TypedQuery<Manager> query = em.createQuery(
                 "SELECT m FROM Manager m WHERE m.cpf = :cpf", Manager.class);
@@ -23,7 +33,6 @@ public class ManagerDAO {
     }
 
     public boolean existsByCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
         try {
             TypedQuery<Long> query = em.createQuery(
                 "SELECT COUNT(m) FROM Manager m WHERE m.cpf = :cpf", Long.class);
@@ -35,7 +44,6 @@ public class ManagerDAO {
     }
 
     public boolean existsClientWithSameCpf(String cpf) {
-        EntityManager em = JpaConfig.getEntityManager();
         try {
             TypedQuery<Long> query = em.createQuery(
                 "SELECT COUNT(c) FROM Client c WHERE c.cpf = :cpf", Long.class);
@@ -47,7 +55,6 @@ public class ManagerDAO {
     }
 
     public void update(Manager manager) {
-        EntityManager em = JpaConfig.getEntityManager();
         try {
             em.getTransaction().begin();
             em.merge(manager);
@@ -61,7 +68,6 @@ public class ManagerDAO {
     }
 
     public void save(Manager manager) {
-        EntityManager em = JpaConfig.getEntityManager();
         try {
             em.getTransaction().begin();
             em.persist(manager);
@@ -75,7 +81,6 @@ public class ManagerDAO {
     }
 
     public void delete(Manager manager) {
-        EntityManager em = JpaConfig.getEntityManager();
         try {
             em.getTransaction().begin();
             Manager managedManager = em.merge(manager);
@@ -90,7 +95,6 @@ public class ManagerDAO {
     }
 
 	public void createManager(Manager newManager) {
-		EntityManager em = JpaConfig.getEntityManager();
         try {
         	em.getTransaction().begin();
             em.persist(newManager);
@@ -100,6 +104,14 @@ public class ManagerDAO {
             if (em.getTransaction().isActive()) em.getTransaction().rollback();
             throw new RuntimeException("Failed to register client: " + e.getMessage(), e);
         } finally {
+            em.close();
+        }
+	}
+
+	@Override
+	public void close() throws Exception {
+		
+		if (em != null && em.isOpen()) {
             em.close();
         }
 	}

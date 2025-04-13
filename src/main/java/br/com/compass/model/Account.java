@@ -1,7 +1,5 @@
 package br.com.compass.model;
 
-import java.math.BigDecimal;
-
 import br.com.compass.model.enums.AccountType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -3,6 +3,8 @@ package br.com.compass.dao;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
@@ -11,6 +13,7 @@ import java.util.Set;
 import br.com.compass.config.JpaConfig;
 import br.com.compass.model.Account;
 import br.com.compass.model.AuditLog;
+import br.com.compass.model.Client;
 import br.com.compass.model.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -19,14 +22,13 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 
-public class AuditLogDAO {
+public class AuditLogDAO implements AutoCloseable{
     private EntityManager em;
 
     public AuditLogDAO() {
         this.em = JpaConfig.getEntityManager();
     }
 
-    // Constantes para tipos de ação
     public static final String LOGIN_SUCCESS = "LOGIN_SUCCESS";
     public static final String LOGIN_FAILURE = "LOGIN_FAILURE";
     public static final String LOGOUT = "LOGOUT";
@@ -42,6 +44,13 @@ public class AuditLogDAO {
     public static final String ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED";
     public static final String CLIENT_REGISTRATION = "CLIENT_REGISTRATION";
     public static final String CLIENT_REGISTRATION_FAILED = "CLIENT_REGISTRATION_FAILED";
+    public static final String ACCOUNT_EXTRACT = "ACCOUNT_EXTRACT";
+    public static final String REVERSAL_APPROVED = "REVERSAL_APPROVED";
+    public static final String REVERSAL_REJECTED = "REVERSAL_REJECTED";
+    public static final String ACCOUNT_CLOSURE_APPROVED = "ACCOUNT_CLOSURE_APPROVED";
+    public static final String ACCOUNT_CLOSURE_REJECTED = "ACCOUNT_CLOSURE_REJECTED";
+    public static final String CLIENT_UNBLOCKED = "CLIENT_UNBLOCKED";
+
 
     public List<AuditLog> findLogs(List<String> actionTypes, User user, Account account, 
                                   LocalDateTime startDate, LocalDateTime endDate) {
@@ -92,7 +101,8 @@ public class AuditLogDAO {
             System.out.println("4. View Financial Transactions");
             System.out.println("5. View Client Registration Logs");
             System.out.println("6. View Account Management Logs");
-            System.out.println("7. Custom Filter");
+            System.out.println("7. View Extract Logs");
+            System.out.println("8. Custom Filter");
             System.out.println("0. Back to Main Menu");
             System.out.print("Select an option: ");
             
@@ -120,7 +130,7 @@ public class AuditLogDAO {
                     break;
                 case 3:
                     logs = auditLogDAO.findLogs(
-                        List.of(ACCOUNT_ACCESS, ACCOUNT_CREATION, ACCOUNT_CLOSURE), 
+                        List.of(ACCOUNT_ACCESS, ACCOUNT_CREATION, ACCOUNT_CLOSURE, CLIENT_UNBLOCKED), 
                         null, null, null, null);
                     displayLogs(logs);
                     break;
@@ -137,13 +147,20 @@ public class AuditLogDAO {
                     displayLogs(logs);
                     break;
                 case 6:
-                    logs = auditLogDAO.findLogs(
-                        List.of(ACCOUNT_BLOCKED, ACCOUNT_UNLOCKED, REVERSAL_REQUEST), 
-                        null, null, null, null);
-                    displayLogs(logs);
+                	logs = auditLogDAO.findLogs(
+                		    List.of(ACCOUNT_BLOCKED, ACCOUNT_UNLOCKED, REVERSAL_REQUEST, REVERSAL_APPROVED, REVERSAL_REJECTED,
+                		    		ACCOUNT_CLOSURE_APPROVED, ACCOUNT_CLOSURE_REJECTED), 
+                		    null, null, null, null);
                     break;
                 case 7:
-                    customFilterMenu(scanner, auditLogDAO);
+                	logs = auditLogDAO.findLogs(
+                            List.of(ACCOUNT_EXTRACT), 
+                            null, null, null, null);
+                        displayLogs(logs);
+                    // customFilterMenu(scanner, auditLogDAO);
+                    break;
+                case 8:
+                	customFilterMenu(scanner, auditLogDAO);
                     break;
                 case 0:
                     return;
@@ -174,6 +191,9 @@ public class AuditLogDAO {
         System.out.println("13. Account Unlocked");
         System.out.println("14. Client Registration");
         System.out.println("15. Client Registration Failed");
+        System.out.println("16. Reversal Approved");
+        System.out.println("17. Reversal Rejected");
+        System.out.println("18. Client Unblocking");
         System.out.println("0. Finish Selection");
         
         while (true) {
@@ -202,6 +222,11 @@ public class AuditLogDAO {
                         case 13: actionTypes.add(ACCOUNT_UNLOCKED); break;
                         case 14: actionTypes.add(CLIENT_REGISTRATION); break;
                         case 15: actionTypes.add(CLIENT_REGISTRATION_FAILED); break;
+                        case 16: actionTypes.add(REVERSAL_APPROVED); break;
+                        case 17: actionTypes.add(REVERSAL_REJECTED); break;
+                        case 18: actionTypes.add(CLIENT_UNBLOCKED); break;
+
+                        
                         default: System.out.println("Invalid choice: " + num);
                     }
                 }
@@ -265,4 +290,93 @@ public class AuditLogDAO {
                 account);
         }
     }
+    
+    public static List<AuditLog> findByAccount(Account account) {
+        if (account == null) return Collections.emptyList();
+
+        EntityManager em = JpaConfig.getEntityManager();
+        try {
+            String jpql = "SELECT a FROM AuditLog a WHERE a.affectedAccount = :account ORDER BY a.timestamp";
+            return em.createQuery(jpql, AuditLog.class)
+                     .setParameter("account", account)
+                     .getResultList();
+        } catch (Exception e) {
+            System.err.println("Error while fetching audit logs by account: " + e.getMessage());
+            return Collections.emptyList();
+        } finally {
+            em.close();
+        }
+    }
+
+    public static List<AuditLog> findByClient(Client client) {
+        if (client == null || client == null) return Collections.emptyList();
+
+        EntityManager em = JpaConfig.getEntityManager();
+        try {
+            String jpql = "SELECT a FROM AuditLog a WHERE a.actor = :client ORDER BY a.timestamp";
+            return em.createQuery(jpql, AuditLog.class)
+                     .setParameter("client", client)
+                     .getResultList();
+        } catch (Exception e) {
+            System.err.println("Error while fetching audit logs by client: " + e.getMessage());
+            return Collections.emptyList();
+        } finally {
+            em.close();
+        }
+    }
+
+    
+    public static List<AuditLog> findByAccountAndActions(Account account, Set<String> actionTypes) {
+        if (actionTypes == null || actionTypes.isEmpty()) return Collections.emptyList();
+
+        EntityManager em = JpaConfig.getEntityManager();
+        try {
+            return em.createQuery(
+                "SELECT a FROM AuditLog a WHERE a.affectedAccount = :account AND a.actionType IN :types ORDER BY a.timestamp",
+                AuditLog.class)
+                .setParameter("account", account)
+                .setParameter("types", actionTypes)
+                .getResultList();
+        } finally {
+            em.close();
+        }
+    }
+    
+    public static List<AuditLog> findDepositsByAccount(Account account) {
+        return findByAccountAndActions(account, Set.of(DEPOSIT));
+    }
+
+    public static List<AuditLog> findWithdrawalsByAccount(Account account) {
+        return findByAccountAndActions(account, Set.of(WITHDRAWAL));
+    }
+
+    public static List<AuditLog> findTransfersSentByAccount(Account account) {
+        return findByAccountAndActions(account, Set.of(TRANSFER_OUT));
+    }
+
+    public static List<AuditLog> findTransfersReceivedByAccount(Account account) {
+        return findByAccountAndActions(account, Set.of(TRANSFER_IN));
+    }
+
+    public static List<AuditLog> findAllAccountOperations(Account account) {
+    	
+        List<AuditLog> allOperations = new ArrayList<>();
+
+        allOperations.addAll(AuditLogDAO.findDepositsByAccount(account));
+        allOperations.addAll(AuditLogDAO.findWithdrawalsByAccount(account));
+        allOperations.addAll(AuditLogDAO.findTransfersReceivedByAccount(account));
+        allOperations.addAll(AuditLogDAO.findTransfersSentByAccount(account));
+
+        allOperations.sort(Comparator.comparing(AuditLog::getTimestamp));
+        return allOperations;
+    }
+
+    @Override
+	public void close() throws Exception {
+		
+		if (em != null && em.isOpen()) {
+            em.close();
+        }
+	}
+    
 }

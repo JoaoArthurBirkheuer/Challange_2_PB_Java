@@ -1,38 +1,40 @@
 package br.com.compass.dao;
 
-import java.util.List;
-import java.util.Optional;
-
 import br.com.compass.config.JpaConfig;
 import br.com.compass.model.Account;
 import br.com.compass.model.Client;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.TypedQuery;
 import jakarta.persistence.EntityTransaction;
+import java.util.List;
 
-public class AccountDAO {
-
-    private EntityManager em;
+public class AccountDAO implements AutoCloseable {
+    private final EntityManager em;
 
     public AccountDAO() {
         this.em = JpaConfig.getEntityManager();
     }
 
-    public List<Account> findActiveAccountsByClient(Client client) {
-        String jpql = "SELECT a FROM Account a WHERE a.owner = :owner AND a.active = true";
-        TypedQuery<Account> query = em.createQuery(jpql, Account.class);
-        query.setParameter("owner", client);
-        return query.getResultList();
+    public AccountDAO(EntityManager em) {
+        this.em = em;
     }
 
-    public List<Account> findAllActiveAccounts() {
-        String jpql = "SELECT a FROM Account a WHERE a.active = true";
-        TypedQuery<Account> query = em.createQuery(jpql, Account.class);
-        return query.getResultList();
+    public EntityTransaction beginTransaction() {
+        if (em.getTransaction().isActive()) {
+            em.getTransaction().rollback();
+        }
+        return em.getTransaction();
     }
 
     public Account findById(Long id) {
         return em.find(Account.class, id);
+    }
+
+    public Account findByAccountNumber(String accountNumber) {
+        return em.createQuery("SELECT a FROM Account a WHERE a.accountNumber = :number", Account.class)
+               .setParameter("number", accountNumber)
+               .getResultStream()
+               .findFirst()
+               .orElse(null);
     }
 
     public void update(Account account) {
@@ -43,10 +45,17 @@ public class AccountDAO {
             tx.commit();
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
-            throw e;
+            throw new RuntimeException("Failed to update account", e);
         }
     }
 
+    @Override
+    public void close() {
+        if (em != null && em.isOpen()) {
+            em.close();
+        }
+    }
+    
     public void save(Account account) {
         EntityTransaction tx = em.getTransaction();
         try {
@@ -55,16 +64,26 @@ public class AccountDAO {
             tx.commit();
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
-            throw e;
+            throw new RuntimeException("Failed to save account", e);
         }
     }
 
-    public Optional<Account> findByAccountNumber(String accountNumber) {
-        String jpql = "SELECT a FROM Account a WHERE a.accountNumber = :accountNumber";
-        TypedQuery<Account> query = em.createQuery(jpql, Account.class);
-        query.setParameter("accountNumber", accountNumber);
+    public List<Account> findActiveAccountsByClient(Client client) {
+        return em.createQuery(
+            "SELECT a FROM Account a WHERE a.owner = :owner AND a.active = true", Account.class)
+            .setParameter("owner", client)
+            .getResultList();
+    }
 
-        List<Account> resultList = query.getResultList();
-        return resultList.isEmpty() ? Optional.empty() : Optional.of(resultList.get(0));
+    public List<Account> findAllInactiveAccounts() {
+        return em.createQuery(
+            "SELECT a FROM Account a WHERE a.active = false", Account.class)
+            .getResultList();
+    }
+
+    public void clearCache() {
+        if (em.isOpen()) {
+            em.clear();
+        }
     }
 }

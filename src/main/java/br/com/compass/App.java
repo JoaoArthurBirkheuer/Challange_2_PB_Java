@@ -4,33 +4,48 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.Set;
 
 import br.com.compass.dao.AccountDAO;
 import br.com.compass.dao.AuditLogDAO;
 import br.com.compass.dao.ClientDAO;
 import br.com.compass.dao.ManagerDAO;
+import br.com.compass.dao.ReversalRequestDAO;
 //import br.com.compass.dao.ReversalRequestDAO;
 import br.com.compass.dao.TransactionDAO;
 import br.com.compass.dao.UserDAO;
 import br.com.compass.exceptions.BusinessException;
+// import br.com.compass.exceptions.BusinessRuleException;
 import br.com.compass.model.Account;
+import br.com.compass.model.AccountInactivationRequest;
+import br.com.compass.model.AuditLog;
 import br.com.compass.model.Client;
 import br.com.compass.model.Manager;
+import br.com.compass.model.ReversalRequest;
 import br.com.compass.model.Transaction;
 import br.com.compass.model.User;
 import br.com.compass.model.enums.AccountType;
+import br.com.compass.model.enums.TransactionType;
+import br.com.compass.services.AccountService;
 import br.com.compass.services.AuditService;
 import br.com.compass.services.AuthService;
+import br.com.compass.services.InactivationRequestService;
 import br.com.compass.services.ReversalService;
 import br.com.compass.utils.CPFValidator;
 import br.com.compass.utils.PasswordHasher;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 
 public class App {
-	
+
 	/// TO GO TO MAIN MENU TYPE 000
 	/// TO GO TO CLIENT MENU TYPE 111
 	/// TO GO TO MANAGER MENU TYPE 222
@@ -41,874 +56,1667 @@ public class App {
 	/// TO GO TO TRANSFER-MENU, TYPE 777
 	/// TO GO TO REVERSAL REQUEST MENU, TYPE 888
 	/// TO GO TO ACCOUNT INACTIVATION MENU, TYPE 999
-    private static UserDAO userDAO = new UserDAO();
-    private static final AccountDAO accountDAO = new AccountDAO();
-    //private static final ReversalRequestDAO reversalRequestDAO = new ReversalRequestDAO();
-    private static final TransactionDAO transactionDAO = new TransactionDAO();
-    public static void main(String[] args) {
-        br.com.compass.config.DataSeeder.seed();
-        Scanner scanner = new Scanner(System.in);
-        mainMenu(scanner);
-        scanner.close();
-        System.out.println("Application closed");
-    }
+	private static UserDAO userDAO = new UserDAO();
+	private static final AccountDAO accountDAO = new AccountDAO();
+	//private static final ReversalRequestDAO reversalRequestDAO = new ReversalRequestDAO();
+	private static final AccountService as = new AccountService(accountDAO);
+	//private static final ClientDAO clientDAO = new ClientDAO();
+	private static final ReversalService reversalService = new ReversalService();
 
-    // 000
-    public static void mainMenu(Scanner scanner) {
-        boolean running = true;
+	public static void main(String[] args) {
+		br.com.compass.config.DataSeeder.seed();
+		Scanner scanner = new Scanner(System.in);
+		mainMenu(scanner);
+		scanner.close();
+		System.out.println("Application closed");
+	}
 
-        while (running) {
-            System.out.println("\n========= MAIN MENU =========");
-            System.out.println("1. Login");
-            System.out.println("2. Open New Account");
-            System.out.println("3. Get System Operations");
-            System.out.println("0. Exit");
-            System.out.println("============================");
-            System.out.print("Select an option: ");
+	// 000
+	public static void mainMenu(Scanner scanner) {
+		boolean running = true;
 
-            int option;
-            try {
-                option = scanner.nextInt();
-            } catch (Exception e) {
-                System.out.println("Invalid input. Please enter a number.");
-                scanner.nextLine();
-                continue;
-            }
-            scanner.nextLine();
+		while (running) {
+			System.out.println("\n========= MAIN MENU =========");
+			System.out.println("1. Login");
+			System.out.println("2. Open New Account");
+			System.out.println("3. Get System Operations");
+			System.out.println("0. Exit");
+			System.out.println("============================");
+			System.out.print("Select an option: ");
 
-            switch (option) {
-                case 1:
-                    loginMenu(scanner);
-                    break;
-                case 2:
-                    System.out.println("\n>> Account Opening");
-                    registerClient(scanner);
-                    break;
-                case 3:
-                	AuditLogDAO.showAuditLogMenu(scanner);
-                	break;
-                case 0:
-                    running = false;
-                    break;
-                default:
-                    System.out.println("Invalid option! Please try again.");
-            }
-        }
-    }
-    
-    /// 555
-    private static void registerClient(Scanner scanner) {
-        System.out.println("\n=== NEW CLIENT REGISTRATION === (Enter '0' at any time to cancel)");
+			int option;
+			try {
+				option = scanner.nextInt();
+			} catch (Exception e) {
+				System.out.println("Invalid input. Please enter a number.");
+				scanner.nextLine();
+				continue;
+			}
+			scanner.nextLine();
 
-        // Name validation
-        String name;
-        do {
-            System.out.print("\nFull Name (minimum 3 characters): ");
-            name = scanner.nextLine().trim();
-            
-            if (name.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            if (name.isEmpty()) {
-                System.out.println("Error: Name cannot be empty!");
-            } else if (name.length() < 3) {
-                System.out.println("Error: Name must have at least 3 characters!");
-            }
-        } while (name.isEmpty() || name.length() < 3);
+			switch (option) {
+			case 1:
+				loginMenu(scanner);
+				break;
+			case 2:
+				System.out.println("\n>> Account Opening");
+				registerClient(scanner);
+				break;
+			case 3:
+				AuditLogDAO.showAuditLogMenu(scanner);
+				break;
+			case 0:
+				running = false;
+				break;
+			default:
+				System.out.println("Invalid option! Please try again.");
+			}
+		}
+	}
 
-        // CPF validation
-        String cpf;
-        boolean cpfValid = false;
-        do {
-            System.out.print("\nCPF (format: XXX.XXX.XXX-XX): ");
-            cpf = scanner.nextLine().trim();
-            
-            if (cpf.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            if (!CPFValidator.isValidFormat(cpf)) {
-                System.out.println("Error: Invalid CPF format! Please use XXX.XXX.XXX-XX pattern.");
-                continue;
-            }
-            
-            if (!CPFValidator.isValidCPF(cpf)) {
-                System.out.println("Error: Invalid CPF number! Please check the digits.");
-                continue;
-            }
-            
-            if (userDAO.findClientByCpf(cpf) != null) {
-                System.out.println("Error: This CPF is already registered!");
-                continue;
-            }
-            
-            cpfValid = true;
-        } while (!cpfValid);
-
-        // Birth Date validation
-        LocalDate birthDate = null;
-        boolean dateValid = false;
-        do {
-            System.out.print("\nBirth Date (DD/MM/YYYY): ");
-            String dateInput = scanner.nextLine().trim();
-            
-            if (dateInput.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            try {
-                birthDate = LocalDate.parse(dateInput, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                LocalDate minimumDate = LocalDate.now().minusYears(18);
-                
-                if (birthDate.isAfter(minimumDate)) {
-                    System.out.println("Error: You must be at least 18 years old to open an account!");
-                } else {
-                    dateValid = true;
-                }
-            } catch (DateTimeParseException e) {
-                System.out.println("Error: Invalid date format! Please use DD/MM/YYYY.");
-            }
-        } while (!dateValid);
-
-        // Phone validation
-        String phone;
-        boolean phoneValid = false;
-        do {
-            System.out.print("\nPhone Number (at least 8 digits): ");
-            phone = scanner.nextLine().trim();
-            
-            if (phone.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            String digitsOnly = phone.replaceAll("[^0-9]", "");
-            if (digitsOnly.length() < 8) {
-                System.out.println("Error: Phone number must contain at least 8 digits!");
-            } else {
-                phoneValid = true;
-            }
-        } while (!phoneValid);
-
-        // Account Type selection
-        AccountType accountType = null;
-        boolean typeValid = false;
-        do {
-            System.out.println("\nSelect Account Type:");
-            System.out.println("1. Checking Account");
-            System.out.println("2. Salary Account");
-            System.out.println("3. Savings Account");
-            System.out.println("4. Investments Account");
-            System.out.println("0. Cancel Registration");
-            System.out.print("Choose [1-4] or 0 to cancel: ");
-            
-            String typeInput = scanner.nextLine().trim();
-            
-            if (typeInput.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            try {
-                int choice = Integer.parseInt(typeInput);
-                switch(choice) {
-                    case 1: 
-                        accountType = AccountType.CHECKING;
-                        typeValid = true;
-                        break;
-                    case 2: 
-                        accountType = AccountType.SALARY;
-                        typeValid = true;
-                        break;
-                    case 3: 
-                        accountType = AccountType.SAVINGS;
-                        typeValid = true;
-                        break;
-                    case 4: 
-                        accountType = AccountType.INVESTMENT;
-                        typeValid = true;
-                        break;
-                    default:
-                        System.out.println("Error: Please select a valid option (1-4)!");
-                }
-            } catch (NumberFormatException e) {
-                System.out.println("Error: Please enter a number!");
-            }
-        } while (!typeValid);
-
-        // Password validation
-        String password;
-        boolean passwordValid = false;
-        do {
-            System.out.print("\nCreate Password (cannot be empty or '0'): ");
-            password = scanner.nextLine().trim();
-            
-            if (password.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            if (password.isEmpty()) {
-                System.out.println("Error: Password cannot be empty!");
-            } else if (password.equals("0")) {
-                System.out.println("Error: Password cannot be just '0'!");
-            } else {
-                // Confirm password
-                System.out.print("Confirm Password: ");
-                String confirmPassword = scanner.nextLine().trim();
-                
-                if (!password.equals(confirmPassword)) {
-                    System.out.println("Error: Passwords don't match! Please try again.");
-                } else {
-                    passwordValid = true;
-                }
-            }
-        } while (!passwordValid);
-
-        // Final confirmation
-        System.out.println("\n=== REGISTRATION SUMMARY ===");
-        System.out.println("Name: " + name);
-        System.out.println("CPF: " + cpf);
-        System.out.println("Birth Date: " + birthDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-        System.out.println("Phone: " + phone);
-        System.out.println("Account Type: " + accountType);
-        System.out.print("\nConfirm registration? (Y/N): ");
-        
-        String confirmation = scanner.nextLine().trim().toUpperCase();
-        if (!confirmation.equals("Y")) {
-            System.out.println("Registration cancelled.");
-            return;
-        }
-
-        try {
-          
-            Client newClient = new Client();
-            newClient.setName(name);
-            newClient.setCpf(cpf);
-            newClient.setBirthDate(birthDate);
-            newClient.setCellphoneNumber(phone);
-         
-            byte[] salt = PasswordHasher.generateSalt();
-            newClient.setPasswordSalt(salt);
-            newClient.setPasswordHash(PasswordHasher.hashPassword(password, salt));
-            
-            Account newAccount = new Account();
-            newAccount.setOwner(newClient);
-            newAccount.setAccountNumber(generateAccountNumber());
-            newAccount.setBalance(null);
-            newAccount.setActive(true);
-            newAccount.setType(accountType);
-            
-            ClientDAO clientDAO = new ClientDAO();
-            clientDAO.createClient(newClient);
-            
-            AccountDAO accountDAO = new AccountDAO();
-            accountDAO.save(newAccount);
-            AuditService.logAction("ACCOUNT_CREATION", 
-                "New " + accountType + " account created", 
-                LocalDateTime.now(),
-                newClient, 
-                newAccount);
-                
-            System.out.println("\nRegistration successful!");
-            System.out.println("Your account number: " + newAccount.getAccountNumber());
-            
-        } catch (Exception e) {
-            AuditService.logAction("ACCOUNT_CREATION_FAILED", 
-                "Error: " + e.getMessage(), 
-                LocalDateTime.now(),
-                null, 
-                null);
-            System.out.println("Registration failed: " + e.getMessage());
-        }
-    }
-    
-    /// 444
-    private static void registerManager(Scanner scanner) {
-        System.out.println("\n=== NEW MANAGER REGISTRATION === (Enter '0' at any time to cancel)");
-
-        // Name validation
-        String name;
-        do {
-            System.out.print("\nFull Name (minimum 3 characters): ");
-            name = scanner.nextLine().trim();
-            
-            if (name.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            if (name.isEmpty()) {
-                System.out.println("Error: Name cannot be empty!");
-            } else if (name.length() < 3) {
-                System.out.println("Error: Name must have at least 3 characters!");
-            }
-        } while (name.isEmpty() || name.length() < 3);
-
-        // CPF validation
-        String cpf;
-        boolean cpfValid = false;
-        do {
-            System.out.print("\nCPF (format: XXX.XXX.XXX-XX): ");
-            cpf = scanner.nextLine().trim();
-            
-            if (cpf.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            if (!CPFValidator.isValidFormat(cpf)) {
-                System.out.println("Error: Invalid CPF format! Please use XXX.XXX.XXX-XX pattern.");
-                continue;
-            }
-            
-            if (!CPFValidator.isValidCPF(cpf)) {
-                System.out.println("Error: Invalid CPF number! Please check the digits.");
-                continue;
-            }
-            
-            if (userDAO.findManagerByCpf(cpf) != null) {
-                System.out.println("Error: This CPF is already registered!");
-                continue;
-            }
-            
-            cpfValid = true;
-        } while (!cpfValid);
-
-        // Birth Date validation
-        LocalDate birthDate = null;
-        boolean dateValid = false;
-        do {
-            System.out.print("\nBirth Date (DD/MM/YYYY): ");
-            String dateInput = scanner.nextLine().trim();
-            
-            if (dateInput.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            try {
-                birthDate = LocalDate.parse(dateInput, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                LocalDate minimumDate = LocalDate.now().minusYears(18);
-                
-                if (birthDate.isAfter(minimumDate)) {
-                    System.out.println("Error: You must be at least 18 years old to have a manager access!");
-                } else {
-                    dateValid = true;
-                }
-            } catch (DateTimeParseException e) {
-                System.out.println("Error: Invalid date format! Please use DD/MM/YYYY.");
-            }
-        } while (!dateValid);
-
-        // Phone validation
-        String phone;
-        boolean phoneValid = false;
-        do {
-            System.out.print("\nPhone Number (at least 8 digits): ");
-            phone = scanner.nextLine().trim();
-            
-            if (phone.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            String digitsOnly = phone.replaceAll("[^0-9]", "");
-            if (digitsOnly.length() < 8) {
-                System.out.println("Error: Phone number must contain at least 8 digits!");
-            } else {
-                phoneValid = true;
-            }
-        } while (!phoneValid);
-
-        // Password validation
-        String password;
-        boolean passwordValid = false;
-        do {
-            System.out.print("\nCreate Password (cannot be empty or '0'): ");
-            password = scanner.nextLine().trim();
-            
-            if (password.equals("0")) {
-                System.out.println("Registration cancelled.");
-                return;
-            }
-            
-            if (password.isEmpty()) {
-                System.out.println("Error: Password cannot be empty!");
-            } else if (password.equals("0")) {
-                System.out.println("Error: Password cannot be just '0'!");
-            } else {
-                // Confirm password
-                System.out.print("Confirm Password: ");
-                String confirmPassword = scanner.nextLine().trim();
-                
-                if (!password.equals(confirmPassword)) {
-                    System.out.println("Error: Passwords don't match! Please try again.");
-                } else {
-                    passwordValid = true;
-                }
-            }
-        } while (!passwordValid);
-
-        // Final confirmation
-        System.out.println("\n=== REGISTRATION SUMMARY ===");
-        System.out.println("Name: " + name);
-        System.out.println("CPF: " + cpf);
-        System.out.println("Birth Date: " + birthDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-        System.out.println("Phone: " + phone);
-        System.out.print("\nConfirm registration? (Y/N): ");
-        
-        String confirmation = scanner.nextLine().trim().toUpperCase();
-        if (!confirmation.equals("Y")) {
-            System.out.println("Registration cancelled.");
-            return;
-        }
-
-        try {
-            // Create client
-            Manager newManager= new Manager();
-            newManager.setName(name);
-            newManager.setCpf(cpf);
-            newManager.setBirthDate(birthDate);
-            newManager.setCellphoneNumber(phone);
-            
-            // Secure password setup
-            byte[] salt = PasswordHasher.generateSalt();
-            newManager.setPasswordSalt(salt);
-            newManager.setPasswordHash(PasswordHasher.hashPassword(password, salt));
-            
-            // Persist data
-            ManagerDAO managerDAO = new ManagerDAO();
-            managerDAO.createManager(newManager);
-            
-            // Audit log
-            AuditService.logAction("ACCOUNT_CREATION", 
-                "New Manager created", 
-                LocalDateTime.now(),
-                newManager, 
-                null);
-                
-            System.out.println("\nRegistration successful!");
-            
-        } catch (Exception e) {
-            AuditService.logAction("ACCOUNT_CREATION_FAILED", 
-                "Error: " + e.getMessage(), 
-                LocalDateTime.now(),
-                null, 
-                null);
-            System.out.println("Registration failed: " + e.getMessage());
-        }
-    }
-
-    private static String generateAccountNumber() {
-        return String.format("%08d", new Random().nextInt(100000000));
-    }
-
-    /// 333
-   public static void loginMenu(Scanner scanner) {
-        System.out.print("\n>> Enter CPF: ");
-        String cpf = scanner.nextLine();
-
-        AuthService authService = new AuthService(userDAO);
-        AuthService.LoginType loginType = authService.checkLoginType(cpf);
-
-        if (loginType == null) {
-            System.out.println("CPF not registered in the system.");
-            AuditService.logAction("LOGIN_ATTEMPT", "Failed login - CPF not found", 
-                                LocalDateTime.now(), null, null);
-            return;
-        }
-
-        switch (loginType) {
-            case MANAGER_ONLY:
-                handleManagerLogin(scanner, authService, cpf);
-                break;
-            case CLIENT_ONLY:
-                handleClientLogin(scanner, authService, cpf);
-                break;
-            case BOTH:
-                handleDualRoleLogin(scanner, authService, cpf);
-                break;
-        }
-    }
-
-   private static void handleManagerLogin(Scanner scanner, AuthService authService, String cpf) {
-	    System.out.print(">> Enter manager password: ");
-	    String password = scanner.nextLine();
-
-	    User user = authService.login(cpf, password, AuthService.LoginType.MANAGER_ONLY);
+	/// 555
+	private static void registerClient(Scanner scanner) {
+	    // 1. Initialize all variables
+	    String name = null;
+	    String cpf = null;
+	    LocalDate birthDate = null;
+	    String phone = null;
+	    AccountType accountType = null;
+	    String password = null;
 	    
-	    if (user != null) {
-	        System.out.println("\nSuccessfully logged in as Manager.");
-	        // Get a fresh managed instance of the user
-	        User managedUser = userDAO.findById(user.getId());
-	        AuditService.logAction("LOGIN_SUCCESS", "Manager login successful", 
-	                            LocalDateTime.now(), managedUser, null);
-	        managerMenu(scanner, (Manager) user);
-	    } else {
-	        System.out.println("Incorrect password for manager.");
-	        AuditService.logAction("LOGIN_FAILURE", "Manager login failed - wrong password", 
-	                            LocalDateTime.now(), null, null); // Now allowed to pass null
+	    // 2. Name Validation
+	    System.out.println("\n=== NEW CLIENT REGISTRATION === (Enter '0' at any time to cancel)");
+	    boolean nameValid = false;
+	    while (!nameValid) {
+	        System.out.print("\nFull Name (minimum 3 characters): ");
+	        name = scanner.nextLine().trim();
+
+	        if (name.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
+
+	        if (name.isEmpty()) {
+	            System.out.println("Error: Name cannot be empty!");
+	        } else if (name.length() < 3) {
+	            System.out.println("Error: Name must have at least 3 characters!");
+	        } else {
+	            nameValid = true;
+	        }
+	    }
+
+	    // 3. CPF Validation
+	    boolean cpfValid = false;
+	    while (!cpfValid) {
+	        System.out.print("\nCPF (format: XXX.XXX.XXX-XX): ");
+	        cpf = scanner.nextLine().trim();
+
+	        if (cpf.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
+
+	        // Format validation
+	        if (!cpf.matches("\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}")) {
+	            System.out.println("Error: Invalid CPF format! Please use XXX.XXX.XXX-XX pattern.");
+	            continue;
+	        }
+
+	        // Digit validation
+	        if (!CPFValidator.isValidCPF(cpf)) {
+	            System.out.println("Error: Invalid CPF number! Please check the digits.");
+	            continue;
+	        }
+
+	        // Uniqueness check
+	        try (ClientDAO tempClientDAO = new ClientDAO()) {
+	            if (tempClientDAO.findByCpf(cpf) != null) {
+	                System.out.println("Error: This CPF is already registered!");
+	                continue;
+	            }
+	            cpfValid = true;
+	        } catch (Exception e) {
+	            System.out.println("Error verifying CPF: " + e.getMessage());
+	        }
+	    }
+
+	    // 4. Birth Date Validation
+	    boolean dateValid = false;
+	    while (!dateValid) {
+	        System.out.print("\nBirth Date (DD/MM/YYYY): ");
+	        String dateInput = scanner.nextLine().trim();
+
+	        if (dateInput.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
+
+	        try {
+	            birthDate = LocalDate.parse(dateInput, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+	            LocalDate minimumDate = LocalDate.now().minusYears(18);
+
+	            if (birthDate.isAfter(minimumDate)) {
+	                System.out.println("Error: You must be at least 18 years old!");
+	            } else {
+	                dateValid = true;
+	            }
+	        } catch (DateTimeParseException e) {
+	            System.out.println("Error: Invalid date format! Use DD/MM/YYYY.");
+	        }
+	    }
+
+	    // 5. Phone Validation
+	    boolean phoneValid = false;
+	    while (!phoneValid) {
+	        System.out.print("\nPhone Number (with area code): ");
+	        phone = scanner.nextLine().trim();
+
+	        if (phone.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
+
+	        String digitsOnly = phone.replaceAll("[^0-9]", "");
+	        if (digitsOnly.length() < 11) {  // Brazil standard with DDD
+	            System.out.println("Error: Phone must have at least 11 digits (including area code)!");
+	        } else {
+	            phoneValid = true;
+	        }
+	    }
+
+	    // 6. Account Type Selection
+	    boolean typeValid = false;
+	    while (!typeValid) {
+	        System.out.println("\nSelect Account Type:");
+	        System.out.println("1. Checking Account");
+	        System.out.println("2. Salary Account");
+	        System.out.println("3. Savings Account");
+	        System.out.println("4. Investments Account");
+	        System.out.println("0. Cancel Registration");
+	        System.out.print("Choose [1-4] or 0 to cancel: ");
+
+	        String typeInput = scanner.nextLine().trim();
+	        if (typeInput.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
+
+	        try {
+	            int choice = Integer.parseInt(typeInput);
+	            accountType = switch (choice) {
+	                case 1 -> AccountType.CHECKING;
+	                case 2 -> AccountType.SALARY;
+	                case 3 -> AccountType.SAVINGS;
+	                case 4 -> AccountType.INVESTMENT;
+	                default -> {
+	                    System.out.println("Error: Invalid choice!");
+	                    yield null;
+	                }
+	            };
+	            if (accountType != null) typeValid = true;
+	        } catch (NumberFormatException e) {
+	            System.out.println("Error: Please enter a number!");
+	        }
+	    }
+
+	    // 7. Password Validation
+	    boolean passwordValid = false;
+	    while (!passwordValid) {
+	        System.out.print("\nCreate Password (min 8 chars, 1 number, 1 special char): ");
+	        password = scanner.nextLine().trim();
+
+	        if (password.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
+
+	        if (password.length() < 8) {
+	            System.out.println("Error: Password must be at least 8 characters!");
+	            continue;
+	        }
+
+	        if (!password.matches(".*\\d.*")) {
+	            System.out.println("Error: Password must contain at least 1 number!");
+	            continue;
+	        }
+
+	        if (!password.matches(".*[!@#$%^&*()].*")) {
+	            System.out.println("Error: Password must contain at least 1 special character!");
+	            continue;
+	        }
+
+	        System.out.print("Confirm Password: ");
+	        String confirmPassword = scanner.nextLine().trim();
+	        if (!password.equals(confirmPassword)) {
+	            System.out.println("Error: Passwords don't match!");
+	        } else {
+	            passwordValid = true;
+	        }
+	    }
+
+	    // 8. Final Confirmation
+	    System.out.println("\n=== REGISTRATION SUMMARY ===");
+	    System.out.println("Name: " + name);
+	    System.out.println("CPF: " + cpf);
+	    System.out.println("Birth Date: " + birthDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+	    System.out.println("Phone: " + phone);
+	    System.out.println("Account Type: " + accountType);
+	    System.out.print("\nConfirm registration? (Y/N): ");
+
+	    String confirmation = scanner.nextLine().trim().toUpperCase();
+	    if (!confirmation.equalsIgnoreCase("Y")) {
+	        System.out.println("Registration cancelled.");
+	        return;
+	    }
+
+	    // 9. Database Operations
+	    try {
+	        // Create objects first
+	        Client newClient = new Client();
+	        newClient.setName(name);
+	        newClient.setCpf(cpf);
+	        newClient.setBirthDate(birthDate);
+	        newClient.setCellphoneNumber(phone);
+	        
+	        byte[] salt = PasswordHasher.generateSalt();
+	        newClient.setPasswordSalt(salt);
+	        newClient.setPasswordHash(PasswordHasher.hashPassword(password, salt));
+
+	        Account newAccount = new Account();
+	        newAccount.setOwner(newClient);
+	        newAccount.setAccountNumber(generateAccountNumber());
+	        newAccount.setBalance(0.0);
+	        newAccount.setActive(true);
+	        newAccount.setType(accountType);
+
+	        // Use a single DAO with proper transaction management
+	        try (ClientDAO clientDAO = new ClientDAO()) {
+	            EntityManager em = clientDAO.getEntityManager();
+	            
+	            // Check if transaction is already active
+	            if (em.getTransaction().isActive()) {
+	                em.getTransaction().rollback();
+	            }
+
+	            EntityTransaction tx = em.getTransaction();
+	            try {
+	                tx.begin();
+	                
+	                // Persist client
+	                em.persist(newClient);
+	                em.flush(); // Ensure client gets ID
+	                
+	                // Persist account
+	                newAccount.setOwner(newClient); // Ensure relationship
+	                em.persist(newAccount);
+	                
+	                tx.commit();
+
+	                // Audit Log
+	                AuditService.logAction(
+	                    "ACCOUNT_CREATION",
+	                    String.format("New %s account created for %s", accountType, name),
+	                    LocalDateTime.now(),
+	                    newClient,
+	                    newAccount
+	                );
+
+	                System.out.println("\n✅ Registration successful!");
+	                System.out.println("Account Number: " + newAccount.getAccountNumber());
+	                System.out.println("Initial Balance: $0.00");
+
+	            } catch (Exception e) {
+	                if (tx != null && tx.isActive()) {
+	                    tx.rollback();
+	                }
+	                AuditService.logAction(
+	                    "REGISTRATION_FAILED",
+	                    "Error: " + e.getMessage(),
+	                    LocalDateTime.now(),
+	                    null,
+	                    null
+	                );
+	                System.out.println("❌ Registration failed: " + e.getMessage());
+	            }
+	        }
+	    } catch (Exception e) {
+	        System.out.println("❌ System error: " + e.getMessage());
 	    }
 	}
 
-    private static void handleClientLogin(Scanner scanner, AuthService authService, String cpf) {
-        Client client = (Client) userDAO.findClientByCpf(cpf);
-        
-        if (client.getBlocked()) {
-            System.out.println("\nACCOUNT BLOCKED: Too many failed attempts");
-            System.out.println("Please contact a manager to unlock your account.");
-            AuditService.logAction("LOGIN_ATTEMPT", "Blocked client login attempt", 
-                                LocalDateTime.now(), client, null);
-            return;
-        }
+	/// 444
+	private static void registerManager(Scanner scanner, Manager manager) {
+	    // 1. Authorization Check
+	    if (manager.getId() != 1) {
+	        System.out.println("Only Super Manager can register new managers");
+	        return;
+	    }
 
-        System.out.print(">> Enter client password: ");
-        String password = scanner.nextLine();
+	    // 2. Initialization
+	    System.out.println("\n=== NEW MANAGER REGISTRATION === (Enter '0' at any time to cancel)");
+	    String name = null;
+	    String cpf = null;
+	    LocalDate birthDate = null;
+	    String phone = null;
+	    String password = null;
 
-        User user = authService.login(cpf, password, AuthService.LoginType.CLIENT_ONLY);
-        
-        if (user != null) {
-            client.resetLoginAttempts();
-            userDAO.update(client);
-            System.out.println("\nSuccessfully logged in as Client.");
-            AuditService.logAction("LOGIN_SUCCESS", "Client login successful", 
-                                LocalDateTime.now(), user, null);
-            clientMenu(scanner, (Client) user);
-        } else {
-            client.incrementLoginAttempts();
-            userDAO.update(client);
-            
-            if (client.getLoginAttempts() >= 3) {
-                System.out.println("\nACCOUNT BLOCKED: 3 failed attempts");
-                System.out.println("Contact a manager to unlock your account.");
-                AuditService.logAction("ACCOUNT_BLOCKED", "Client account blocked after 3 failed attempts", 
-                                    LocalDateTime.now(), client, null);
-            } else {
-                System.out.println("\nIncorrect password. Attempts: " + 
-                    client.getLoginAttempts() + "/3");
-                AuditService.logAction("LOGIN_FAILURE", "Client login failed - wrong password", 
-                                    LocalDateTime.now(), client, null);
-            }
-        }
-    }
+	    // 3. Name Validation
+	    boolean nameValid = false;
+	    while (!nameValid) {
+	        System.out.print("\nFull Name (minimum 3 characters): ");
+	        name = scanner.nextLine().trim();
 
-    private static void handleDualRoleLogin(Scanner scanner, AuthService authService, String cpf) {
-        System.out.println("\nThis CPF is registered as both Manager and Client.");
-        System.out.println("1. Login as Manager");
-        System.out.println("2. Login as Client");
-        System.out.println("0. Cancel");
-        System.out.print("Select login type: ");
+	        if (name.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
 
-        int choice;
-        try {
-            choice = scanner.nextInt();
-        } catch (Exception e) {
-            System.out.println("Invalid input.");
-            scanner.nextLine();
-            AuditService.logAction("LOGIN_ATTEMPT", "Invalid input in dual role selection", 
-                                LocalDateTime.now(), null, null);
-            return;
-        }
-        scanner.nextLine();
+	        if (name.isEmpty()) {
+	            System.out.println("Error: Name cannot be empty!");
+	        } else if (name.length() < 3) {
+	            System.out.println("Error: Name must have at least 3 characters!");
+	        } else {
+	            nameValid = true;
+	        }
+	    }
 
-        switch (choice) {
-            case 1:
-                handleManagerLogin(scanner, authService, cpf);
-                break;
-            case 2:
-                handleClientLogin(scanner, authService, cpf);
-                break;
-            case 0:
-                System.out.println("Login cancelled.");
-                AuditService.logAction("LOGIN_CANCELLED", "User cancelled dual role login", 
-                                    LocalDateTime.now(), null, null);
-                break;
-            default:
-                System.out.println("Invalid option.");
-                AuditService.logAction("LOGIN_ATTEMPT", "Invalid option in dual role selection", 
-                                    LocalDateTime.now(), null, null);
-        }
-    }
+	    // 4. CPF Validation
+	    boolean cpfValid = false;
+	    while (!cpfValid) {
+	        System.out.print("\nCPF (format: XXX.XXX.XXX-XX): ");
+	        cpf = scanner.nextLine().trim();
 
-    /// 222
-    public static void managerMenu(Scanner scanner, Manager manager) {
-        boolean running = true;
-        while (running) {
-            System.out.println("\n======= MANAGER MENU =======");
-            System.out.println("1. Register New Manager");
-            System.out.println("2. Unlock Client");
-            System.out.println("3. Review Reversal Requests");
-            System.out.println("4. Account Inactivation (Requests)");
-            System.out.println("5. Account Reactivation");
-            System.out.println("0. Logout");
-            System.out.println("============================");
-            System.out.print("Select an option: ");
+	        if (cpf.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
 
-            int option;
-            try {
-                option = scanner.nextInt();
-            } catch (Exception e) {
-                System.out.println("Invalid input. Please enter a number.");
-                scanner.nextLine();
-                continue;
-            }
-            scanner.nextLine();
+	        // Format validation
+	        if (!cpf.matches("\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}")) {
+	            System.out.println("Error: Invalid CPF format! Please use XXX.XXX.XXX-XX pattern.");
+	            continue;
+	        }
 
-            switch (option) {
-                case 1:
-                    System.out.println("\n>> Manager Registration");
-                    registerManager(scanner);
-                    break;
-                case 2:
-                    System.out.println("\n>> Unlocking Accounts");
-                    // TODO
-                    break;
-                case 3:
-                    System.out.println("\n>> Reversal Requests");
-                    // TODO
-                    break;
-                case 4:
-                    System.out.println("\n>> Account Closure Requests");
-                    // TODO
-                    break;
-                case 0:
-                    running = false;
-                    System.out.println("Logging out...");
-                    break;
-                default:
-                    System.out.println("Invalid option.");
-            }
-        }
-    }
+	        // Digit validation
+	        if (!CPFValidator.isValidCPF(cpf)) {
+	            System.out.println("Error: Invalid CPF number! Please check the digits.");
+	            continue;
+	        }
 
-    /// 111
-    public static void clientMenu(Scanner scanner, Client client) {
-        AccountDAO accountDAO = new AccountDAO();
-        boolean choosing = true;
+	        // Uniqueness check
+	        try (ManagerDAO tempManagerDAO = new ManagerDAO()) {
+	            if (tempManagerDAO.findByCpf(cpf) != null) {
+	                System.out.println("Error: This CPF is already registered!");
+	                continue;
+	            }
+	            cpfValid = true;
+	        } catch (Exception e) {
+	            System.out.println("Error verifying CPF: " + e.getMessage());
+	        }
+	    }
 
-        while (choosing) {
-            List<Account> accounts = accountDAO.findActiveAccountsByClient(client);
+	    // 5. Birth Date Validation
+	    boolean dateValid = false;
+	    while (!dateValid) {
+	        System.out.print("\nBirth Date (DD/MM/YYYY): ");
+	        String dateInput = scanner.nextLine().trim();
 
-            System.out.println("\n>> Your Active Accounts:");
-            if (accounts.isEmpty()) {
-                System.out.println("You don't have any active accounts.");
-                return;
-            }
+	        if (dateInput.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
 
-            for (int i = 0; i < accounts.size(); i++) {
-                Account acc = accounts.get(i);
-                System.out.printf("%d. Account #%s | Balance: $%.2f%n", 
-                    (i + 1), acc.getAccountNumber(), acc.getBalance());
-            }
-            System.out.println("0. Back");
-            System.out.print("Select account: ");
+	        try {
+	            birthDate = LocalDate.parse(dateInput, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+	            LocalDate minimumDate = LocalDate.now().minusYears(18);
 
-            int accountChoice;
-            try {
-                accountChoice = scanner.nextInt();
-            } catch (Exception e) {
-                System.out.println("Invalid input.");
-                scanner.nextLine();
-                continue;
-            }
-            scanner.nextLine();
+	            if (birthDate.isAfter(minimumDate)) {
+	                System.out.println("Error: You must be at least 18 years old!");
+	            } else {
+	                dateValid = true;
+	            }
+	        } catch (DateTimeParseException e) {
+	            System.out.println("Error: Invalid date format! Please use DD/MM/YYYY.");
+	        }
+	    }
 
-            if (accountChoice == 0) {
-                choosing = false;
-            } else if (accountChoice > 0 && accountChoice <= accounts.size()) {
-                Account selectedAccount = accounts.get(accountChoice - 1);
-                clientAccountMenu(scanner, client, selectedAccount);
-            } else {
-                System.out.println("Invalid selection. Please try again.");
-            }
-        }
-    }
+	    // 6. Phone Validation
+	    boolean phoneValid = false;
+	    while (!phoneValid) {
+	        System.out.print("\nPhone Number (with area code): ");
+	        phone = scanner.nextLine().trim();
 
-    /// 666
-    public static void clientAccountMenu(Scanner scanner, Client client, Account account) {
-        boolean running = true;
+	        if (phone.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
 
-        while (running) {
-            System.out.println("\n======= ACCOUNT MENU =======");
-            System.out.println("1. Check Balance");
-            System.out.println("2. Make Deposit");
-            System.out.println("3. Make Withdrawal");
-            System.out.println("4. Transfer Funds");
-            System.out.println("5. Request Transaction Reversal");
-            System.out.println("6. Request Account Closure");
-            System.out.println("7. Download CSV History of Account");
-            System.out.println("0. Back to Accounts");
-            System.out.println("============================");
-            System.out.print("Select an option: ");
+	        String digitsOnly = phone.replaceAll("[^0-9]", "");
+	        if (digitsOnly.length() < 11) {  // Brazil standard with DDD
+	            System.out.println("Error: Phone must have at least 11 digits (including area code)!");
+	        } else {
+	            phoneValid = true;
+	        }
+	    }
 
-            int option;
-            try {
-                option = scanner.nextInt();
-            } catch (Exception e) {
-                System.out.println("Invalid input.");
-                scanner.nextLine();
-                continue;
-            }
-            scanner.nextLine();
+	    // 7. Password Validation
+	    boolean passwordValid = false;
+	    while (!passwordValid) {
+	        System.out.print("\nCreate Password (min 8 chars, 1 number, 1 special char): ");
+	        password = scanner.nextLine().trim();
 
-            switch (option) {
-                case 1:
-                    System.out.printf("\nCurrent balance: $%.2f%n", account.getBalance());
-                    break;
-                case 2:
-                    System.out.print("Enter deposit amount: $");
-                    double depositAmount = scanner.nextDouble();
-                    scanner.nextLine();
-                    account.setBalance(account.getBalance() + depositAmount);
-                    accountDAO.update(account);
-                    AuditService.logAction("DEPOSIT", "Deposited $" + depositAmount, LocalDateTime.now(), client, account);
-                    System.out.printf("$%.2f deposited successfully.%n", depositAmount);
-                    break;
-                case 3:
-                    System.out.print("Enter withdrawal amount: $");
-                    double withdrawAmount = scanner.nextDouble();
-                    scanner.nextLine();
-                    if (account.getBalance() >= withdrawAmount) {
-                        account.setBalance(account.getBalance() - withdrawAmount);
-                        accountDAO.update(account);
-                        AuditService.logAction("WITHDRAWAL", "Withdrew $" + withdrawAmount, LocalDateTime.now(), client, account);
-                        System.out.printf("$%.2f withdrawn successfully.%n", withdrawAmount);
-                    } else {
-                        System.out.println("Insufficient funds.");
-                    }
-                    break;
-                case 4:
-                	System.out.print("Recipient account number: ");
-                	String destAccountNumber = scanner.nextLine();
+	        if (password.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
 
-                	System.out.print("Transfer amount: $");
-                	double transferAmount = scanner.nextDouble();
-                	scanner.nextLine();
+	        if (password.length() < 8) {
+	            System.out.println("Error: Password must be at least 8 characters!");
+	            continue;
+	        }
 
-                	if (transferAmount <= 0) {
-                	    System.out.println("Transfer amount must be greater than zero.");
-                	    return;
-                	}
+	        if (!password.matches(".*\\d.*")) {
+	            System.out.println("Error: Password must contain at least 1 number!");
+	            continue;
+	        }
 
-                	Optional<Account> destination = accountDAO.findByAccountNumber(destAccountNumber);
+	        if (!password.matches(".*[!@#$%^&*()].*")) {
+	            System.out.println("Error: Password must contain at least 1 special character!");
+	            continue;
+	        }
 
-                	if (destination.isEmpty()) {
-                	    System.out.println("No account found with number: " + destAccountNumber);
-                	    return;
-                	}
-                	else if (transferAmount <= 0) {
-                	    System.out.println("Transfer amount must be greater than zero.");
-                	    return;
-                	}
+	        System.out.print("Confirm Password: ");
+	        String confirmPassword = scanner.nextLine().trim();
+	        if (!password.equals(confirmPassword)) {
+	            System.out.println("Error: Passwords don't match!");
+	        } else {
+	            passwordValid = true;
+	        }
+	    }
 
-                	else if (account.getBalance() >= transferAmount) {
-                	    account.setBalance(account.getBalance() - transferAmount);
-                	    destination.get().setBalance(destination.get().getBalance() + transferAmount);
-                	    accountDAO.update(account);
-                	    accountDAO.update(destination.get());
-                	    AuditService.logAction("TRANSFER_OUT", "Transferred $" + transferAmount + " to " + destAccountNumber, LocalDateTime.now(), client, account);
-                	    AuditService.logAction(
-                	        "TRANSFER_IN",
-                	        "Received $" + transferAmount + " from " + account.getAccountNumber(),
-                	        LocalDateTime.now(),
-                	        destination.get().getOwner(),
-                	        destination.get()
-                	    );
-                	    System.out.printf("Transferred $%.2f to account %s%n", transferAmount, destAccountNumber);
-                	} else {
-                	    System.out.println("Invalid transfer: insufficient funds.");
-                	}
+	    // 8. Final Confirmation
+	    System.out.println("\n=== REGISTRATION SUMMARY ===");
+	    System.out.println("Name: " + name);
+	    System.out.println("CPF: " + cpf);
+	    System.out.println("Birth Date: " + birthDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+	    System.out.println("Phone: " + phone);
+	    System.out.print("\nConfirm registration? (Y/N): ");
 
-                    break;
-                case 5:
-                    reversalRequestMenu(scanner, client, account);
-                    break;
-                case 6:
-                    System.out.print("Are you sure you want to close this account? (Y/N): ");
-                    String confirm = scanner.nextLine();
-                    if (confirm.equalsIgnoreCase("Y")) {
-                        account.setClosureRequested(true);
-                        accountDAO.update(account);
-                        AuditService.logAction("ACCOUNT_CLOSURE_REQUESTED", "Client requested account closure.", LocalDateTime.now(), client, account);
-                        System.out.println("Account closure request submitted.");
-                        return;
-                    }
-                    System.out.println("Operation cancelled.");
-                    break;
-                case 0:
-                    running = false;
-                    break;
-                default:
-                    System.out.println("Invalid option.");
-            }
-        }
-    }    //
-    ///
-    ///
-    ///
-    ///
-    ///
-    ///
-    ///
-    ///
-    ///
-    ///
-    ///
-    ///
-    /////
+	    String confirmation = scanner.nextLine().trim().toUpperCase();
+	    if (!confirmation.equals("Y")) {
+	        System.out.println("Registration cancelled.");
+	        return;
+	    }
 
-    public static void reversalRequestMenu(Scanner scanner, Client client, Account account) {
-    	List<Transaction> reversibleTransactions = transactionDAO.findByAccount(account).stream()
-    		    .filter(Transaction::getIsReversible)
-    		    .toList();
+	    // 9. Database Operations
+	    try (ManagerDAO managerDAO = new ManagerDAO()) {
+	        EntityTransaction tx = managerDAO.beginTransaction();
+	        try {
+	            // Create Manager
+	            Manager newManager = new Manager();
+	            newManager.setName(name);
+	            newManager.setCpf(cpf);
+	            newManager.setBirthDate(birthDate);
+	            newManager.setCellphoneNumber(phone);
+	            
+	            // Password Hashing
+	            byte[] salt = PasswordHasher.generateSalt();
+	            newManager.setPasswordSalt(salt);
+	            newManager.setPasswordHash(PasswordHasher.hashPassword(password, salt));
+	            
+	            managerDAO.save(newManager);
+	            tx.commit();
 
-        if (reversibleTransactions.isEmpty()) {
-            System.out.println("No reversible transactions found.");
-            return;
-        }
+	            // Audit Log
+	            AuditService.logAction(
+	                "MANAGER_CREATION",
+	                "New manager account created",
+	                LocalDateTime.now(),
+	                newManager,
+	                null
+	            );
 
-        System.out.println("\nSelect a transaction to request reversal:");
-        for (int i = 0; i < reversibleTransactions.size(); i++) {
-            Transaction txn = reversibleTransactions.get(i);
-            System.out.printf("%d. TXN#%d - $%.2f - %s\n",
-                i + 1, txn.getId(), txn.getAmount(), txn.getType());
-        }
-        System.out.println("0. Cancel");
-        System.out.print("Your selection: ");
+	            System.out.println("\n✅ Registration successful!");
 
-        int txChoice;
-        try {
-            txChoice = scanner.nextInt();
-        } catch (Exception e) {
-            System.out.println("Invalid input.");
-            scanner.nextLine();
-            return;
-        }
-        scanner.nextLine();
+	        } catch (Exception e) {
+	            if (tx.isActive()) tx.rollback();
+	            AuditService.logAction(
+	                "MANAGER_CREATION_FAILED",
+	                "Error: " + e.getMessage(),
+	                LocalDateTime.now(),
+	                null,
+	                null
+	            );
+	            System.out.println("❌ Registration failed: " + e.getMessage());
+	        }
+	    } catch (Exception e) {
+	        System.out.println("❌ System error: " + e.getMessage());
+	    }
+	}
 
-        if (txChoice == 0 || txChoice > reversibleTransactions.size()) return;
+	private static String generateAccountNumber() {
+		return String.format("%08d", new Random().nextInt(100000000));
+	}
 
-        Transaction selectedTransaction = reversibleTransactions.get(txChoice - 1);
+	/// 333
+	public static void loginMenu(Scanner scanner) {
+		System.out.print("\n>> Enter CPF: ");
+		String cpf = scanner.nextLine();
 
-        System.out.print("Reason for reversal: ");
-        String reason = scanner.nextLine();
+		AuthService authService = new AuthService(userDAO);
+		AuthService.LoginType loginType = authService.checkLoginType(cpf);
 
-        ReversalService reversalService = new ReversalService();
-        try {
-            reversalService.requestReversal(client, selectedTransaction, reason);
-            AuditService.logAction("REVERSAL_REQUESTED", 
-                "Requested reversal for TXN#" + selectedTransaction.getId() + ": " + reason,
-                LocalDateTime.now(), client, account);
+		if (loginType == null) {
+			System.out.println("CPF not registered in the system.");
+			AuditService.logAction("LOGIN_ATTEMPT", "Failed login - CPF not found", LocalDateTime.now(), null, null);
+			// return;
+		}
 
-            System.out.println("Reversal request submitted.");
-        } catch (BusinessException e) {
-            System.out.println("Error: " + e.getMessage());
-        }
-    }
+		switch (loginType) {
+		case MANAGER_ONLY:
+			handleManagerLogin(scanner, authService, cpf);
+			break;
+		case CLIENT_ONLY:
+			handleClientLogin(scanner, authService, cpf);
+			break;
+		case BOTH:
+			handleDualRoleLogin(scanner, authService, cpf);
+			break;
+		}
+	}
+
+	private static void handleManagerLogin(Scanner scanner, AuthService authService, String cpf) {
+	    try (UserDAO userDAO = new UserDAO()) {
+	        System.out.print(">> Enter manager password: ");
+	        String password = scanner.nextLine();
+
+	        User user = authService.login(cpf, password, AuthService.LoginType.MANAGER_ONLY);
+
+	        if (user != null) {
+	            System.out.println("\nSuccessfully logged in as Manager.");
+	            User managedUser = userDAO.findById(user.getId());
+	            AuditService.logAction("LOGIN_SUCCESS", "Manager login successful", 
+	                LocalDateTime.now(), managedUser, null);
+	            managerMenu(scanner, (Manager) user);
+	        } else {
+	            System.out.println("Incorrect password for manager.");
+	            AuditService.logAction("LOGIN_FAILURE", "Manager login failed - wrong password", 
+	                LocalDateTime.now(), null, null);
+	        }
+	    } catch (Exception e) {
+	        System.err.println("Login error: " + e.getMessage());
+	        AuditService.logAction("LOGIN_ERROR", "Manager login error: " + e.getMessage(), 
+	            LocalDateTime.now(), null, null);
+	    }
+	}
+
+	private static void handleClientLogin(Scanner scanner, AuthService authService, String cpf) {
+	    try (UserDAO userDAO = new UserDAO()) {
+	        Client client = (Client) userDAO.findClientByCpf(cpf);
+
+	        if (client.getBlocked()) {
+	            System.out.println("\nACCOUNT BLOCKED: Too many failed attempts");
+	            System.out.println("Please contact a manager to unlock your account.");
+	            AuditService.logAction("LOGIN_ATTEMPT", "Blocked client login attempt", 
+	                LocalDateTime.now(), client, null);
+	            return;
+	        }
+
+	        System.out.print(">> Enter client password: ");
+	        String password = scanner.nextLine();
+
+	        User user = authService.login(cpf, password, AuthService.LoginType.CLIENT_ONLY);
+
+	        if (user != null) {
+	            client.resetLoginAttempts();
+	            userDAO.update(client);
+	            System.out.println("\nSuccessfully logged in as Client.");
+	            AuditService.logAction("LOGIN_SUCCESS", "Client login successful", 
+	                LocalDateTime.now(), user, null);
+	            clientMenu(scanner, (Client) user);
+	        } else {
+	            client.incrementLoginAttempts();
+	            userDAO.update(client);
+
+	            if (client.getLoginAttempts() >= 3) {
+	                System.out.println("\nACCOUNT BLOCKED: 3 failed attempts");
+	                System.out.println("Contact a manager to unlock your account.");
+	                AuditService.logAction("ACCOUNT_BLOCKED", 
+	                    "Client account blocked after 3 failed attempts",
+	                    LocalDateTime.now(), client, null);
+	            } else {
+	                System.out.println("\nIncorrect password. Attempts: " + client.getLoginAttempts() + "/3");
+	                AuditService.logAction("LOGIN_FAILURE", "Client login failed - wrong password", 
+	                    LocalDateTime.now(), client, null);
+	            }
+	        }
+	    } catch (Exception e) {
+	        System.err.println("Login error: " + e.getMessage());
+	        AuditService.logAction("LOGIN_ERROR", "Client login error: " + e.getMessage(), 
+	            LocalDateTime.now(), null, null);
+	    }
+	}
+
+	private static void handleDualRoleLogin(Scanner scanner, AuthService authService, String cpf) {
+	    try {
+	        System.out.println("\nThis CPF is registered as both Manager and Client.");
+	        System.out.println("1. Login as Manager");
+	        System.out.println("2. Login as Client");
+	        System.out.println("0. Cancel");
+	        System.out.print("Select login type: ");
+
+	        int choice;
+	        try {
+	            choice = scanner.nextInt();
+	        } catch (Exception e) {
+	            System.out.println("Invalid input.");
+	            scanner.nextLine();
+	            AuditService.logAction("LOGIN_ATTEMPT", "Invalid input in dual role selection", 
+	                LocalDateTime.now(), null, null);
+	            return;
+	        }
+	        scanner.nextLine();
+
+	        switch (choice) {
+	            case 1:
+	                handleManagerLogin(scanner, authService, cpf);
+	                break;
+	            case 2:
+	                handleClientLogin(scanner, authService, cpf);
+	                break;
+	            case 0:
+	                System.out.println("Login cancelled.");
+	                AuditService.logAction("LOGIN_CANCELLED", "User cancelled dual role login", 
+	                    LocalDateTime.now(), null, null);
+	                break;
+	            default:
+	                System.out.println("Invalid option.");
+	                AuditService.logAction("LOGIN_ATTEMPT", "Invalid option in dual role selection", 
+	                    LocalDateTime.now(), null, null);
+	        }
+	    } catch (Exception e) {
+	        System.err.println("Dual role login error: " + e.getMessage());
+	        AuditService.logAction("LOGIN_ERROR", "Dual role login error: " + e.getMessage(), 
+	            LocalDateTime.now(), null, null);
+	    }
+	}
+
+	/// 222
+	public static void managerMenu(Scanner scanner, Manager manager) {
+		boolean running = true;
+		while (running) {
+			System.out.println("\n======= MANAGER MENU =======");
+			System.out.println("1. Register New Manager");
+			System.out.println("2. Unlock Client");
+			System.out.println("3. Review Reversal Requests");
+			System.out.println("4. Account Inactivation Requests");
+			System.out.println("5. Account Reactivation"); // implement
+			System.out.println("0. Logout");
+			System.out.println("============================");
+			System.out.print("Select an option: ");
+
+			int option;
+			try {
+				option = scanner.nextInt();
+			} catch (Exception e) {
+				System.out.println("Invalid input. Please enter a number.");
+				scanner.nextLine();
+				continue;
+			}
+			scanner.nextLine();
+
+			switch (option) {
+			case 1:
+				System.out.println("\n>> Manager Registration");
+				registerManager(scanner, manager);
+				break;
+			case 2:
+				System.out.println("\n>> Locked Clients: ");
+				unlockClient(scanner, manager);
+				break;
+			case 3:
+				System.out.println("\n>> Reversal Requests");
+				reviewReversalRequests(scanner, manager, reversalService);
+				break;
+			case 4:
+				System.out.println("\n>> Account Closure Requests");
+				handleInactivationRequests(scanner, manager);
+				break;
+			case 5:
+				System.out.println("\n>> View Closed Accounts");
+				openClosedAccount(scanner, manager);
+			case 0:
+				running = false;
+				System.out.println("Logging out...");
+				break;
+			default:
+				System.out.println("Invalid option.");
+			}
+		}
+	}
+
+	private static void openClosedAccount(Scanner scanner, Manager manager) {
+	    try (AccountDAO accountDAO = new AccountDAO();
+	         ClientDAO clientDAO = new ClientDAO()) {
+	        
+	        List<Account> closedAccounts = accountDAO.findAllInactiveAccounts();
+	        
+	        if (closedAccounts.isEmpty()) {
+	            System.out.println("No closed accounts found.");
+	            return;
+	        }
+
+	        System.out.println("\nClosed Accounts:");
+	        for (int i = 0; i < closedAccounts.size(); i++) {
+	            Client c = clientDAO.findById(closedAccounts.get(i).getOwner().getId());
+	            System.out.printf("%d. CPF: %s | Name: %s | Account: %s | Attempts: %d\n", 
+	                (i + 1), c.getCpf(), c.getName(), 
+	                closedAccounts.get(i).getAccountNumber(), 
+	                c.getLoginAttempts());
+	        }
+
+	        System.out.print("Enter the account number to reactivate (or 'cancel' to return): ");
+	        String input = scanner.nextLine().trim();
+
+	        if (input.equalsIgnoreCase("cancel")) {
+	            System.out.println("Operation cancelled.");
+	            return;
+	        }
+
+	        Optional<Account> selectedAccountOpt = closedAccounts.stream()
+		            .filter(acc -> acc.getAccountNumber().equals(input))
+		            .findFirst();
+
+	        if (selectedAccountOpt.isEmpty()) {
+	            System.out.println("Account number not found among closed accounts.");
+	            return;
+	        }
+
+	        Account selectedAccount = selectedAccountOpt.get();
+	        selectedAccount.setActive(true);
+	        accountDAO.update(selectedAccount);
+
+	        String details = String.format("Reactivated account %s for client %s (CPF: %s)", 
+	            selectedAccount.getAccountNumber(),
+	            selectedAccount.getOwner().getName(),
+	            selectedAccount.getOwner().getCpf());
+
+	        AuditService.logAction(
+	            "ACCOUNT_REACTIVATED", 
+	            details, 
+	            LocalDateTime.now(), 
+	            manager, 
+	            selectedAccount
+	        );
+
+	        System.out.println("Account " + selectedAccount.getAccountNumber() + " successfully reactivated.");
+
+	    } catch (Exception e) {
+	        System.err.println("Error reactivating account: " + e.getMessage());
+	        AuditService.logAction(
+	            "ACCOUNT_REACTIVATION_FAILED",
+	            "Failed to reactivate account: " + e.getMessage(),
+	            LocalDateTime.now(),
+	            manager,
+	            null
+	        );
+	    }
+	}
+
+	public static void unlockClient(Scanner scanner, Manager currentManager) {
+	    try (ClientDAO clientDAO = new ClientDAO()) {
+	        List<Client> blockedClients = clientDAO.findBlockedClients();
+
+	        if (blockedClients.isEmpty()) {
+	            System.out.println("No blocked clients found.");
+	            return;
+	        }
+
+	        System.out.println("\nBlocked Clients:");
+	        for (int i = 0; i < blockedClients.size(); i++) {
+	            Client c = blockedClients.get(i);
+	            System.out.printf("%d. CPF: %s | Name: %s | ID: %d | Attempts: %d\n", 
+	                (i + 1), c.getCpf(), c.getName(), 
+	                c.getId(), c.getLoginAttempts());
+	        }
+
+	        System.out.print("Select a client to unlock (1-" + blockedClients.size() + " or 0 to cancel): ");
+	        
+	        int accountChoice;
+	        try {
+	            accountChoice = Integer.parseInt(scanner.nextLine());
+	        } catch (NumberFormatException e) {
+	            System.out.println("Invalid input. Operation cancelled.");
+	            AuditService.logAction(
+	                "CLIENT_UNLOCK_ATTEMPT",
+	                "Invalid input format for client selection",
+	                LocalDateTime.now(),
+	                currentManager,
+	                null
+	            );
+	            return;
+	        }
+
+	        if (accountChoice == 0) {
+	            System.out.println("Operation cancelled.");
+	            return;
+	        }
+
+	        if (accountChoice < 1 || accountChoice > blockedClients.size()) {
+	            System.out.println("Invalid selection. Operation cancelled.");
+	            return;
+	        }
+
+	        Client selectedClient = blockedClients.get(accountChoice - 1);
+	        selectedClient.resetLoginAttempts();
+	        selectedClient.setBlocked(false);
+	        clientDAO.update(selectedClient);
+
+	        String details = String.format("Unlocked client %s (CPF: %s)", 
+	            selectedClient.getName(), selectedClient.getCpf());
+	        
+	        AuditService.logAction(
+	            "CLIENT_UNBLOCKED",
+	            details,
+	            LocalDateTime.now(),
+	            currentManager,
+	            null
+	        );
+
+	        System.out.printf("\n✅ Client %s (CPF: %s) has been successfully unlocked.\n", 
+	            selectedClient.getName(), selectedClient.getCpf());
+
+	    } catch (Exception e) {
+	        System.err.println("Error unlocking client: " + e.getMessage());
+	        AuditService.logAction(
+	            "CLIENT_UNLOCK_FAILED",
+	            "Failed to unlock client: " + e.getMessage(),
+	            LocalDateTime.now(),
+	            currentManager,
+	            null
+	        );
+	    }
+	}
+	
+	public static void reviewReversalRequests(Scanner scanner, Manager manager, ReversalService reversalService) {
+	    try {
+	        List<ReversalRequest> pendingRequests = reversalService.findPendingRequests();
+
+	        if (pendingRequests.isEmpty()) {
+	            System.out.println("No pending reversal requests.");
+	            return;
+	        }
+
+	        // Display pending requests
+	        System.out.println("\nPending Reversal Requests:");
+	        for (int i = 0; i < pendingRequests.size(); i++) {
+	            ReversalRequest r = pendingRequests.get(i);
+	            Transaction t = r.getTransaction();
+	            System.out.printf("%d. TXN#%d | $%.2f | From: %s | To: %s | Reason: %s%n", 
+	                i + 1, 
+	                t.getId(),
+	                t.getAmount(),
+	                t.getSourceAccount().getAccountNumber(),
+	                t.getTargetAccount().getAccountNumber(),
+	                r.getReason());
+	        }
+
+	        // Get user selection
+	        System.out.print("\nSelect a request to review (0 to cancel): ");
+	        int choice;
+	        try {
+	            choice = Integer.parseInt(scanner.nextLine());
+	            if (choice == 0) {
+	                System.out.println("Operation cancelled.");
+	                return;
+	            }
+	            if (choice < 1 || choice > pendingRequests.size()) {
+	                System.out.println("Invalid selection.");
+	                return;
+	            }
+	        } catch (NumberFormatException e) {
+	            System.out.println("Invalid input. Please enter a number.");
+	            return;
+	        }
+
+	        ReversalRequest selected = pendingRequests.get(choice - 1);
+	        Transaction transaction = selected.getTransaction();
+
+	        // Get decision
+	        System.out.println("\n1. Approve");
+	        System.out.println("2. Reject");
+	        System.out.print("Choose an option: ");
+	        int decision;
+	        try {
+	            decision = Integer.parseInt(scanner.nextLine());
+	            if (decision != 1 && decision != 2) {
+	                System.out.println("Invalid option selected.");
+	                return;
+	            }
+	        } catch (NumberFormatException e) {
+	            System.out.println("Invalid input. Please enter 1 or 2.");
+	            return;
+	        }
+
+	        System.out.print("Resolution notes: ");
+	        String notes = scanner.nextLine().trim();
+
+	        // Process decision
+	        try (AccountDAO accountDAO = new AccountDAO();
+	             TransactionDAO transactionDAO = new TransactionDAO()) {
+
+	            EntityTransaction tx = accountDAO.beginTransaction();
+	            try {
+	                if (decision == 1) {
+	                    // APPROVE LOGIC
+	                    Account sender = accountDAO.findById(transaction.getSourceAccount().getId());
+	                    Account receiver = accountDAO.findById(transaction.getTargetAccount().getId());
+
+	                    if (receiver.getBalance() < transaction.getAmount()) {
+	                        System.out.println("❌ Reversal failed: insufficient funds in target account.");
+	                        return;
+	                    }
+
+	                    // Update balances
+	                    receiver.setBalance(receiver.getBalance() - transaction.getAmount());
+	                    sender.setBalance(sender.getBalance() + transaction.getAmount());
+
+	                    // Update transaction status
+	                    transaction.setIsReversible(false);
+
+	                    // Persist changes
+	                    accountDAO.update(receiver);
+	                    accountDAO.update(sender);
+	                    transactionDAO.update(transaction);
+
+	                    // Update request status
+	                    reversalService.approveRequest(selected.getId(), manager, notes);
+
+	                    // Audit log
+	                    String auditMessage = String.format(
+	                        "Approved reversal of $%.2f from %s to %s. Notes: %s",
+	                        transaction.getAmount(),
+	                        receiver.getAccountNumber(),
+	                        sender.getAccountNumber(),
+	                        notes
+	                    );
+	                    AuditService.logAction(
+	                        "REVERSAL_APPROVED",
+	                        auditMessage,
+	                        LocalDateTime.now(),
+	                        manager,
+	                        sender
+	                    );
+	                    System.out.println("✅ Reversal approved and processed successfully!");
+
+	                } else {
+	                    // REJECT LOGIC
+	                    reversalService.rejectRequest(selected.getId(), manager, notes);
+	                    AuditService.logAction(
+	                        "REVERSAL_REJECTED",
+	                        String.format("Rejected reversal of TXN#%d ($%.2f). Reason: %s",
+	                            transaction.getId(),
+	                            transaction.getAmount(),
+	                            notes),
+	                        LocalDateTime.now(),
+	                        manager,
+	                        transaction.getSourceAccount()
+	                    );
+	                    System.out.println("✅ Reversal request rejected.");
+	                }
+	                tx.commit();
+	            } catch (Exception e) {
+	                if (tx.isActive()) tx.rollback();
+	                System.err.println("❌ Error processing reversal: " + e.getMessage());
+	                AuditService.logAction(
+	                    "REVERSAL_PROCESSING_ERROR",
+	                    "Failed to process reversal: " + e.getMessage(),
+	                    LocalDateTime.now(),
+	                    manager,
+	                    null
+	                );
+	            }
+	        }
+	    } catch (Exception e) {
+	        System.err.println("❌ System error: " + e.getMessage());
+	        AuditService.logAction(
+	            "REVERSAL_REVIEW_ERROR",
+	            "Error reviewing reversals: " + e.getMessage(),
+	            LocalDateTime.now(),
+	            manager,
+	            null
+	        );
+	    }
+	}
+	
+	///////////////////////////////////////
+
+
+	public static void handleInactivationRequests(Scanner scanner, User manager) {
+	    try (InactivationRequestService requestService = new InactivationRequestService()) {
+	        // Get pending requests
+	        List<AccountInactivationRequest> pendingRequests = requestService.findPendingRequests();
+
+	        if (pendingRequests.isEmpty()) {
+	            System.out.println("\nℹ️ There are no pending inactivation requests.");
+	            return;
+	        }
+
+	        // Display requests
+	        System.out.println("\n⏳ Pending Inactivation Requests:");
+	        for (int i = 0; i < pendingRequests.size(); i++) {
+	            AccountInactivationRequest req = pendingRequests.get(i);
+	            System.out.printf("%d. Account: %s | Client: %s (CPF: %s)%n", 
+	                i + 1,
+	                req.getAccount().getAccountNumber(),
+	                req.getAccount().getOwner().getName(),
+	                req.getAccount().getOwner().getCpf());
+	        }
+
+	        // Get selection
+	        System.out.print("\nSelect a request to handle (1-" + pendingRequests.size() + " or 0 to cancel): ");
+	        int choice;
+	        try {
+	            choice = scanner.nextInt();
+	            scanner.nextLine(); // Consume newline
+	            
+	            if (choice == 0) {
+	                System.out.println("🚫 Operation cancelled.");
+	                return;
+	            }
+	            
+	            if (choice < 1 || choice > pendingRequests.size()) {
+	                System.out.println("❌ Invalid selection.");
+	                return;
+	            }
+	        } catch (InputMismatchException e) {
+	            System.out.println("❌ Invalid input. Please enter a number.");
+	            scanner.nextLine(); // Clear invalid input
+	            return;
+	        }
+
+	        AccountInactivationRequest selectedRequest = pendingRequests.get(choice - 1);
+
+	        // Get action
+	        System.out.println("\n1. Approve");
+	        System.out.println("2. Reject");
+	        System.out.print("Choose an action: ");
+	        
+	        int action;
+	        try {
+	            action = scanner.nextInt();
+	            scanner.nextLine();
+	            
+	            if (action != 1 && action != 2) {
+	                System.out.println("❌ Invalid option.");
+	                return;
+	            }
+	        } catch (InputMismatchException e) {
+	            System.out.println("❌ Invalid input. Please enter 1 or 2.");
+	            scanner.nextLine();
+	            return;
+	        }
+
+	        // Process action
+	        try {
+	            if (action == 1) {
+	                requestService.approveRequest(selectedRequest, manager);
+	                System.out.println("\n✅ Request approved and account deactivated.");
+	            } else {
+	                requestService.rejectRequest(selectedRequest, manager);
+	                System.out.println("\n✅ Request rejected.");
+	            }
+	        } catch (Exception e) {
+	            System.err.println("\n❌ Error processing request: " + e.getMessage());
+	            AuditService.logAction(
+	                "INACTIVATION_REQUEST_ERROR",
+	                "Failed to process inactivation request: " + e.getMessage(),
+	                LocalDateTime.now(),
+	                manager,
+	                selectedRequest.getAccount()
+	            );
+	        }
+	    } catch (Exception e) {
+	        System.err.println("\n❌ System error: " + e.getMessage());
+	        AuditService.logAction(
+	            "INACTIVATION_REVIEW_ERROR",
+	            "Error reviewing inactivation requests: " + e.getMessage(),
+	            LocalDateTime.now(),
+	            manager,
+	            null
+	        );
+	    }
+	}
+	/// AUDIT LOGS HERE
+
+	/// 111
+	public static void clientMenu(Scanner scanner, Client client) {
+		try (AccountDAO accountDAO = new AccountDAO()) {
+			boolean choosing = true;
+
+			while (choosing) {
+				accountDAO.clearCache();
+				List<Account> accounts = accountDAO.findActiveAccountsByClient(client);
+				System.out.println("\n>> Your Active Accounts:");
+				if (accounts.isEmpty()) {
+					System.out.println("You don't have any active accounts.");
+					return;
+				}
+
+				for (int i = 0; i < accounts.size(); i++) {
+				    Account acc = accounts.get(i);
+				    if (acc.getActive()) {
+				        System.out.printf("%d. Account #%s | Balance: $%.2f", (i + 1), acc.getAccountNumber(), acc.getBalance());
+				        if (acc.getClosureRequested()) {
+				            System.out.print(" | CLOSURE REQUESTED");
+				        }
+				        System.out.println(); // Finaliza a linha
+				    }
+				}
+				System.out.println("\n" + (accounts.size() + 1) + ". Create new account");
+				System.out.println("0. Back");
+				System.out.print("Select active or closure requested account: ");
+
+				int accountChoice;
+				try {
+					accountChoice = scanner.nextInt();
+				} catch (Exception e) {
+					System.out.println("Invalid input.");
+					scanner.nextLine();
+					continue;
+				}
+				scanner.nextLine();
+
+				if (accountChoice == 0) {
+					choosing = false;
+				} else if (accountChoice > 0 && accountChoice <= accounts.size()) {
+					Account selectedAccount = accounts.get(accountChoice - 1);
+					clientAccountMenu(scanner, client, selectedAccount, as);
+					AuditService.logAction("ACCOUNT_ACCESS", "Logged in on account" + selectedAccount.getAccountNumber(),
+							LocalDateTime.now(), client, selectedAccount);
+				} else if (accountChoice == accounts.size() + 1) {
+					registerAccount(scanner, client);
+				} else {
+					System.out.println("Invalid selection. Please try again.");
+				}
+			}
+		}
+	}
+
+	/// 666
+	public static void clientAccountMenu(Scanner scanner, Client client, Account account,
+	        AccountService accountService) {
+	    boolean running = true;
+
+	    while (running) {
+	        System.out.println("\n======= ACCOUNT MENU =======");
+	        System.out.println("1. Check Balance");
+	        System.out.println("2. Make Deposit");
+	        System.out.println("3. Make Withdrawal");
+	        System.out.println("4. Transfer Funds");
+	        System.out.println("5. Request Transaction Reversal");
+	        System.out.println("6. Request Account Closure");
+	        System.out.println("7. View Extract of Account");
+	        System.out.println("0. Back to Accounts");
+	        System.out.println("============================");
+	        System.out.print("Select an option: ");
+
+	        int option;
+	        try {
+	            option = scanner.nextInt();
+	        } catch (Exception e) {
+	            System.out.println("Invalid input.");
+	            scanner.nextLine();
+	            continue;
+	        }
+	        scanner.nextLine();
+
+	        try {
+	            switch (option) {
+	                case 1:
+	                    System.out.printf("\nCurrent balance: $%.2f%n", account.getBalance());
+	                    break;
+	                case 2:
+	                    if (!account.getClosureRequested()) {
+	                        System.out.print("Enter deposit amount: $");
+	                        double depositAmount = scanner.nextDouble();
+	                        scanner.nextLine();
+	                        try (AccountDAO accountDAO = new AccountDAO()) {
+	                            account.setBalance(account.getBalance() + depositAmount);
+	                            accountDAO.update(account);
+	                            AuditService.logAction("DEPOSIT", "Deposited $" + depositAmount, LocalDateTime.now(), client,
+	                                    account);
+	                            System.out.printf("$%.2f deposited successfully.%n", depositAmount);
+	                        }
+	                    } else {
+	                        System.out.println("Account has pending closure request\n");
+	                    }
+	                    break;
+	                case 3:
+	                    if (!account.getClosureRequested()) {
+	                        System.out.print("Enter withdrawal amount: $");
+	                        double withdrawAmount = scanner.nextDouble();
+	                        scanner.nextLine();
+	                        if (account.getBalance() >= withdrawAmount) {
+	                            try (AccountDAO accountDAO = new AccountDAO()) {
+	                                account.setBalance(account.getBalance() - withdrawAmount);
+	                                accountDAO.update(account);
+	                                AuditService.logAction("WITHDRAWAL", "Withdrew $" + withdrawAmount, LocalDateTime.now(), client,
+	                                        account);
+	                                System.out.printf("$%.2f withdrawn successfully.%n", withdrawAmount);
+	                            }
+	                        } else {
+	                            System.out.println("Insufficient funds.");
+	                        }
+	                    } else {
+	                        System.out.println("Account has pending closure request\n");
+	                    }
+	                    break;
+	                case 4:
+	                    if (!account.getClosureRequested()) {
+	                        System.out.print("Recipient account number: ");
+	                        String destAccountNumber = scanner.nextLine();
+
+	                        System.out.print("Transfer amount: $");
+	                        double transferAmount = scanner.nextDouble();
+	                        scanner.nextLine();
+
+	                        if (transferAmount <= 0) {
+	                            System.out.println("Transfer amount must be greater than zero.");
+	                            break;
+	                        }
+
+	                        try (AccountDAO accountDAO = new AccountDAO();
+	                             TransactionDAO transactionDAO = new TransactionDAO()) {
+	                            
+	                            Account destination = accountDAO.findByAccountNumber(destAccountNumber);
+
+	                            if (destination == null || !destination.getActive()) {
+	                                System.out.println("No account found with number: " + destAccountNumber);
+	                                break;
+	                            }
+
+	                            if (account.getBalance() >= transferAmount) {
+	                                account.setBalance(account.getBalance() - transferAmount);
+	                                destination.setBalance(destination.getBalance() + transferAmount);
+
+	                                accountDAO.update(account);
+	                                accountDAO.update(destination);
+
+	                                LocalDateTime now = LocalDateTime.now();
+
+	                                // Outgoing transaction
+	                                Transaction transferOut = new Transaction();
+	                                transferOut.setSourceAccount(account);
+	                                transferOut.setTargetAccount(destination);
+	                                transferOut.setAmount(transferAmount);
+	                                transferOut.setTimestamp(now);
+	                                transferOut.setType(TransactionType.TRANSFER_OUT);
+	                                transactionDAO.save(transferOut);
+
+	                                // Incoming transaction
+	                                Transaction transferIn = new Transaction();
+	                                transferIn.setSourceAccount(account);
+	                                transferIn.setTargetAccount(destination);
+	                                transferIn.setAmount(transferAmount);
+	                                transferIn.setTimestamp(now);
+	                                transferIn.setType(TransactionType.TRANSFER_IN);
+	                                transactionDAO.save(transferIn);
+
+	                                // Audit logs
+	                                AuditService.logAction("TRANSFER_OUT",
+	                                        "Transferred $" + transferAmount + " to " + destAccountNumber, now, client, account);
+	                                AuditService.logAction("TRANSFER_IN",
+	                                        "Received $" + transferAmount + " from " + account.getAccountNumber(), now,
+	                                        destination.getOwner(), destination);
+	                                System.out.println("Transfer performed from account " + account.getAccountNumber()
+	                                        + " to account " + destination.getAccountNumber());
+	                            } else {
+	                                System.out.println("Invalid transfer: insufficient funds.");
+	                            }
+	                        }
+	                    } else {
+	                        System.out.println("Account has pending closure request\n");
+	                    }
+	                    break;
+	                case 5:
+	                    reversalRequestMenu(scanner, client, account);
+	                    break;
+	                case 6:
+	                    System.out.print("\nAre you sure you want to close this account? (Y/N): ");
+	                    String confirm = scanner.nextLine();
+	                    if (confirm.equalsIgnoreCase("Y")) {
+	                        try (AccountDAO accountDAO = new AccountDAO()) {
+	                            if (!account.getClosureRequested()) {
+	                                account.setClosureRequested(true);
+	                                accountDAO.update(account);
+	                                AuditService.logAction("ACCOUNT_CLOSURE_REQUESTED", "Client requested account closure.",
+	                                        LocalDateTime.now(), client, account);
+	                                System.out.println("Account closure request submitted.");
+	                            } else {
+	                                System.out.println("Account has pending closure request\n");
+	                            }
+	                        }
+	                    } else {
+	                        System.out.println("Operation cancelled.");
+	                    }
+	                    break;
+	                case 7:
+	                    System.out.print("\nChoose what operation(s) to include in the Extract (0 to quit): \n");
+	                    System.out.println("1 - ALL");
+	                    System.out.println("2 - DEPOSITS ONLY");
+	                    System.out.println("3 - WITHDRAWALS ONLY");
+	                    System.out.println("4 - TRANSFERS (IN & OUT) ONLY");
+	                    System.out.println("5 - Custom Filter\n");
+
+	                    System.out.print("Choose option: ");
+	                    int opt = scanner.nextInt();
+	                    scanner.nextLine(); // clear buffer
+	                    List<AuditLog> logs = new ArrayList<>();
+
+	                    try (AuditLogDAO auditLogDAO = new AuditLogDAO()) {
+	                        switch (opt) {
+	                            case 1:
+	                                logs = AuditLogDAO.findAllAccountOperations(account);
+	                                break;
+	                            case 2:
+	                                logs = AuditLogDAO.findDepositsByAccount(account);
+	                                break;
+	                            case 3:
+	                                logs = AuditLogDAO.findWithdrawalsByAccount(account);
+	                                break;
+	                            case 4:
+	                                logs.addAll(AuditLogDAO.findTransfersSentByAccount(account));
+	                                logs.addAll(AuditLogDAO.findTransfersReceivedByAccount(account));
+	                                logs.sort(Comparator.comparing(AuditLog::getTimestamp));
+	                                break;
+	                            case 5:
+	                                Set<String> actionTypes = new HashSet<>();
+	                                System.out.println("Select action types (comma separated numbers, 0 to finish):");
+	                                System.out.println("1. Deposit");
+	                                System.out.println("2. Withdrawal");
+	                                System.out.println("3. Transfer-in");
+	                                System.out.println("4. Transfer-out");
+	                                System.out.println("0. Finish Selection");
+
+	                                while (true) {
+	                                    System.out.print("Enter choices (e.g., 1,2,3): ");
+	                                    String input = scanner.nextLine().trim();
+
+	                                    if (input.equals("0"))
+	                                        break;
+
+	                                    try {
+	                                        String[] choices = input.split(",");
+	                                        for (String choice : choices) {
+	                                            int num = Integer.parseInt(choice.trim());
+	                                            switch (num) {
+	                                                case 1:
+	                                                    actionTypes.add(AuditLogDAO.DEPOSIT);
+	                                                    break;
+	                                                case 2:
+	                                                    actionTypes.add(AuditLogDAO.WITHDRAWAL);
+	                                                    break;
+	                                                case 3:
+	                                                    actionTypes.add(AuditLogDAO.TRANSFER_IN);
+	                                                    break;
+	                                                case 4:
+	                                                    actionTypes.add(AuditLogDAO.TRANSFER_OUT);
+	                                                    break;
+	                                                default:
+	                                                    System.out.println("Invalid choice: " + num);
+	                                            }
+	                                        }
+
+	                                        logs = AuditLogDAO.findByAccountAndActions(account, actionTypes);
+	                                        break;
+	                                    } catch (NumberFormatException e) {
+	                                        System.out.println("Invalid input. Please enter numbers separated by commas.");
+	                                    }
+	                                }
+	                                break;
+	                            case 0:
+	                                System.out.println("Leaving extract visualization option...\n");
+	                                break;
+	                            default:
+	                                System.out.println("Invalid option.");
+	                                break;
+	                        }
+
+	                        if (!logs.isEmpty()) {
+	                            System.out.println("\n--- Extract for Account: " + account.getAccountNumber() + " ---");
+	                            logs.sort(Comparator.comparing(AuditLog::getTimestamp));
+	                            for (AuditLog log : logs) {
+	                                System.out.println(log.getTimestamp() + " | " + log.getActionType() + " | " + log.getDetails());
+	                            }
+	                            System.out.println("\nWould you like to export this extract as CSV? (y/n)");
+	                            String csvOption = scanner.nextLine().trim().toLowerCase();
+
+	                            if (csvOption.equals("y")) {
+	                                String userHome = System.getProperty("user.home");
+	                                String downloadsPath = userHome + "\\Downloads\\";
+	                                accountService.exportAccountStatementToCSV(account, logs, downloadsPath);
+	                            }
+	                        }
+	                    }
+	                    break;
+	                case 0:
+	                    running = false;
+	                    break;
+	                default:
+	                    System.out.println("Invalid option.");
+	            }
+	        } catch (Exception e) {
+	            System.out.println("An error occurred: " + e.getMessage());
+	            e.printStackTrace();
+	        }
+	    }
+	} //
+	///
+	///
+	///
+	///
+	///
+	///
+	///
+	///
+	///
+	///
+	///
+	///
+	/////
+
+	public static void reversalRequestMenu(Scanner scanner, Client client, Account account) {
+	    try {
+	        // Verifica se a conta tem pedido de encerramento
+	        if (account.getClosureRequested()) {
+	            System.out.println("\n⚠️ Account has pending closure request");
+	            return;
+	        }
+
+	        // Busca transações reversíveis sem solicitações pendentes
+	        List<Transaction> reversibleTransactions;
+	        try (TransactionDAO transactionDAO = new TransactionDAO();
+	             ReversalRequestDAO reversalRequestDAO = new ReversalRequestDAO()) {
+	            
+	            reversibleTransactions = transactionDAO.findReversibleTransactions(account)
+	                .stream()
+	                .filter(txn -> !reversalRequestDAO.hasPendingReversalForTransaction(txn))
+	                .toList();
+	        }
+
+	        if (reversibleTransactions.isEmpty()) {
+	            System.out.println("\nℹ️ No reversible transactions available");
+	            return;
+	        }
+
+	        // Exibe menu de transações
+	        System.out.println("\n🔁 Select a transaction to request reversal:");
+	        for (int i = 0; i < reversibleTransactions.size(); i++) {
+	            Transaction txn = reversibleTransactions.get(i);
+	            String description = switch(txn.getType()) {
+	                case TRANSFER_OUT -> String.format("Transfer to account %s", 
+	                                     txn.getTargetAccount().getAccountNumber());
+	                case TRANSFER_IN -> String.format("Received from account %s", 
+	                                    txn.getSourceAccount().getAccountNumber());
+	                default -> txn.getType().toString();
+	            };
+	            
+	            System.out.printf("%d. TXN#%d - $%.2f - %s (%s)%n",
+	                i + 1, txn.getId(), txn.getAmount(),
+	                description,
+	                txn.getTimestamp().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+	        }
+	        
+	        System.out.println("0. Cancel");
+	        System.out.print("➡️ Your selection: ");
+
+	        // Processa seleção do usuário
+	        try {
+	            int txChoice = scanner.nextInt();
+	            scanner.nextLine(); // Limpa buffer
+	            
+	            if (txChoice == 0 || txChoice > reversibleTransactions.size()) {
+	                return;
+	            }
+
+	            Transaction selectedTransaction = reversibleTransactions.get(txChoice - 1);
+
+	            System.out.print("📝 Reason for reversal: ");
+	            String reason = scanner.nextLine().trim();
+
+	            // Validação do motivo
+	            if (reason.isEmpty()) {
+	                System.out.println("❌ Reason cannot be empty");
+	                return;
+	            }
+
+	            // Cria e processa a solicitação
+	            try (ReversalService reversalService = new ReversalService()) {
+	                reversalService.requestReversal(client, selectedTransaction, reason);
+	                
+	                // Auditoria
+	                AuditService.logAction("REVERSAL_REQUESTED",
+	                    String.format("Requested reversal for TXN#%d (Amount: $%.2f). Reason: %s", 
+	                        selectedTransaction.getId(),
+	                        selectedTransaction.getAmount(),
+	                        reason),
+	                    LocalDateTime.now(), 
+	                    client, 
+	                    account);
+	                    
+	                System.out.println("\n✅ Reversal request submitted successfully!");
+	            }
+	            
+	        } catch (InputMismatchException e) {
+	            System.out.println("❌ Invalid input. Please enter a number.");
+	            scanner.nextLine();
+	        } catch (BusinessException e) {
+	            System.out.println("❌ Error: " + e.getMessage());
+	        }
+	    } catch (Exception e) {
+	        System.err.println("⚠️ System error: " + e.getMessage());
+	        e.printStackTrace();
+	    }
+	}
+///////////////////////
+	private static void registerAccount(Scanner scanner, Client client) {
+	    System.out.println("\n=== NEW ACCOUNT REGISTRATION === (Enter '0' at any time to cancel)");
+
+	    // Account Type selection
+	    AccountType accountType = null;
+	    boolean typeValid = false;
+	    do {
+	        System.out.println("\nSelect Account Type:");
+	        System.out.println("1. Checking Account");
+	        System.out.println("2. Salary Account");
+	        System.out.println("3. Savings Account");
+	        System.out.println("4. Investments Account");
+	        System.out.println("0. Cancel Registration");
+	        System.out.print("Choose [1-4] or 0 to cancel: ");
+
+	        String typeInput = scanner.nextLine().trim();
+
+	        if (typeInput.equals("0")) {
+	            System.out.println("Registration cancelled.");
+	            return;
+	        }
+
+	        try {
+	            int choice = Integer.parseInt(typeInput);
+	            switch (choice) {
+	                case 1:
+	                    accountType = AccountType.CHECKING;
+	                    typeValid = true;
+	                    break;
+	                case 2:
+	                    accountType = AccountType.SALARY;
+	                    typeValid = true;
+	                    break;
+	                case 3:
+	                    accountType = AccountType.SAVINGS;
+	                    typeValid = true;
+	                    break;
+	                case 4:
+	                    accountType = AccountType.INVESTMENT;
+	                    typeValid = true;
+	                    break;
+	                default:
+	                    System.out.println("Error: Please select a valid option (1-4)!");
+	            }
+	        } catch (NumberFormatException e) {
+	            System.out.println("Error: Please enter a number!");
+	        }
+	    } while (!typeValid);
+
+	    // Final confirmation
+	    System.out.println("\n=== REGISTRATION SUMMARY ===");
+	    System.out.println("Account Type: " + accountType);
+	    System.out.print("\nConfirm registration? (Y/N): ");
+
+	    String confirmation = scanner.nextLine().trim().toUpperCase();
+	    if (!confirmation.equals("Y")) {
+	        System.out.println("Registration cancelled.");
+	        return;
+	    }
+
+	    Account newAccount = null;
+	    try {
+	        newAccount = new Account();
+	        newAccount.setOwner(client);
+	        newAccount.setAccountNumber(generateAccountNumber());
+	        newAccount.setBalance(0.0);
+	        newAccount.setActive(true);
+	        newAccount.setType(accountType);
+
+	        try (AccountDAO accountDAO = new AccountDAO()) {
+	            accountDAO.save(newAccount);
+	            
+	            // Log successful creation
+	            AuditService.logAction("ACCOUNT_CREATION", 
+	                "New " + accountType + " account created", 
+	                LocalDateTime.now(),
+	                client, 
+	                newAccount);
+
+	            System.out.println("\nRegistration successful!");
+	            System.out.println("Your account number: " + newAccount.getAccountNumber());
+	        }
+	    } catch (Exception e) {
+	        // Log failed creation attempt
+	        String accountNumber = (newAccount != null) ? newAccount.getAccountNumber() : "N/A";
+	        AuditService.logAction("ACCOUNT_CREATION_FAILED", 
+	            "Failed to create " + accountType + " account. Error: " + e.getMessage(), 
+	            LocalDateTime.now(),
+	            client, 
+	            null);
+
+	        System.out.println("\nRegistration failed: " + e.getMessage());
+	        
+	        if (newAccount != null) {
+	            System.out.println("Account number " + accountNumber + " may not be available.");
+	        }
+	    }
+	}
 
 }
