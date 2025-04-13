@@ -29,54 +29,103 @@ public class ReversalService implements AutoCloseable {
     }
 
     public void requestReversal(Client client, Transaction transaction, String reason) throws BusinessException {
-        EntityTransaction tx = em.getTransaction();
-        try {
-            tx.begin();
-            
-            if (hasPendingReversalForTransaction(transaction)) {
-                throw new BusinessException("This transaction already has a pending reversal request");
+        if (!em.getTransaction().isActive()) {
+            EntityTransaction tx = em.getTransaction();
+            try {
+                tx.begin();
+                processReversalRequest(client, transaction, reason);
+                tx.commit();
+            } catch (Exception e) {
+                if (tx.isActive()) tx.rollback();
+                throw new BusinessException("Failed to process reversal request: " + e.getMessage());
             }
-
-            ReversalRequest request = new ReversalRequest();
-            request.setTransaction(transaction);
-            request.setRequester(client);
-            request.setReason(reason);
-            request.setRequestDate(LocalDateTime.now());
-            request.setStatus(RequestStatus.PENDING);
-            
-            em.persist(request);
-            tx.commit();
-        } catch (Exception e) {
-            if (tx.isActive()) tx.rollback();
-            throw new BusinessException("Failed to process reversal request: " + e.getMessage());
+        } else {
+            processReversalRequest(client, transaction, reason);
         }
     }
 
-    public void approveRequest(Long requestId, Manager manager, String notes) throws BusinessException {
-        EntityTransaction tx = em.getTransaction();
-        try {
-            tx.begin();
-            
-            ReversalRequest request = em.find(ReversalRequest.class, requestId);
-            if (request == null) {
-                throw new BusinessException("Reversal request not found");
-            }
-
-            request.setStatus(RequestStatus.APPROVED);
-            request.setResolver(manager);
-            request.setResolutionNotes(notes);
-            request.setResolutionDate(LocalDateTime.now());
-            
-            em.merge(request);
-            tx.commit();
-        } catch (Exception e) {
-            if (tx.isActive()) tx.rollback();
-            throw new BusinessException("Error approving request: " + e.getMessage());
+    private void processReversalRequest(Client client, Transaction transaction, String reason) {
+        if (hasPendingReversalForTransaction(transaction)) {
+            throw new BusinessException("This transaction already has a pending reversal request");
         }
+
+        ReversalRequest request = new ReversalRequest();
+        request.setTransaction(transaction);
+        request.setRequester(client);
+        request.setReason(reason);
+        request.setRequestDate(LocalDateTime.now());
+        request.setStatus(RequestStatus.PENDING);
+        
+        em.persist(request);
+    }
+
+    public void approveRequest(Long requestId, Manager manager, String notes) throws BusinessException {
+    	 try {
+    	        processApproval(requestId, manager, notes);
+    	    } catch (Exception e) {
+    	        throw new BusinessException("Error approving request: " + e.getMessage());
+    	    }
+    }
+
+    private void processApproval(Long requestId, Manager manager, String notes) {
+        ReversalRequest request = em.find(ReversalRequest.class, requestId);
+        if (request == null) {
+            throw new BusinessException("Reversal request not found");
+        }
+
+        request.setStatus(RequestStatus.APPROVED);
+        request.setResolver(manager);
+        request.setResolutionNotes(notes);
+        request.setResolutionDate(LocalDateTime.now());
+        
+        em.merge(request);
     }
 
     public List<ReversalRequest> findPendingRequests() {
         return reversalRequestDAO.findPendingRequests();
+    }
+
+    public void rejectRequest(Long requestId, Manager manager, String notes) throws BusinessException {
+        if (!em.getTransaction().isActive()) {
+            EntityTransaction tx = em.getTransaction();
+            try {
+                tx.begin();
+                processRejection(requestId, manager, notes);
+                tx.commit();
+            } catch (Exception e) {
+                if (tx.isActive()) tx.rollback();
+                throw new BusinessException("Error rejecting request: " + e.getMessage());
+            }
+        } else {
+            processRejection(requestId, manager, notes);
+        }
+    }
+
+    private void processRejection(Long requestId, Manager manager, String notes) {
+        // Verifica se a entidade está sendo gerenciada
+        ReversalRequest request = em.find(ReversalRequest.class, requestId);
+        if (request == null) {
+            throw new BusinessException("Reversal request not found");
+        }
+
+        // Verifica se a requisição já foi processada
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new BusinessException("Request has already been processed");
+        }
+
+        // Atualiza os campos
+        request.setStatus(RequestStatus.REJECTED);
+        request.setResolver(manager);
+        request.setResolutionNotes(notes);
+        request.setResolutionDate(LocalDateTime.now());
+        
+        // Se a entidade não está sendo gerenciada, faz o merge
+        if (!em.contains(request)) {
+            request = em.merge(request);
+        }
+        
+        // Força o flush se necessário (dependendo da sua estratégia)
+        em.flush();
     }
 
     @Override
@@ -90,30 +139,7 @@ public class ReversalService implements AutoCloseable {
         return reversalRequestDAO.hasPendingReversalForTransaction(transaction);
     }
     
-    public void rejectRequest(Long requestId, Manager manager, String notes) throws BusinessException {
-        EntityTransaction tx = em.getTransaction();
-        try {
-            tx.begin();
-            
-            ReversalRequest request = em.find(ReversalRequest.class, requestId);
-            if (request == null) {
-                throw new BusinessException("Reversal request not found");
-            }
-
-            if (request.getStatus() != RequestStatus.PENDING) {
-                throw new BusinessException("Request has already been processed");
-            }
-
-            request.setStatus(RequestStatus.REJECTED);
-            request.setResolver(manager);
-            request.setResolutionNotes(notes);
-            request.setResolutionDate(LocalDateTime.now());
-            
-            em.merge(request);
-            tx.commit();
-        } catch (Exception e) {
-            if (tx.isActive()) tx.rollback();
-            throw new BusinessException("Error rejecting request: " + e.getMessage());
-        }
+    public EntityManager getEntityManager() {
+        return this.em;
     }
 }

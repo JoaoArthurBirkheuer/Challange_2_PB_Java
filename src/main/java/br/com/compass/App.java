@@ -33,6 +33,7 @@ import br.com.compass.model.ReversalRequest;
 import br.com.compass.model.Transaction;
 import br.com.compass.model.User;
 import br.com.compass.model.enums.AccountType;
+import br.com.compass.model.enums.RequestStatus;
 import br.com.compass.model.enums.TransactionType;
 import br.com.compass.services.AccountService;
 import br.com.compass.services.AuditService;
@@ -824,8 +825,8 @@ public class App {
 	        }
 
 	        Optional<Account> selectedAccountOpt = closedAccounts.stream()
-		            .filter(acc -> acc.getAccountNumber().equals(input))
-		            .findFirst();
+	            .filter(acc -> acc.getAccountNumber().equals(input))
+	            .findFirst();
 
 	        if (selectedAccountOpt.isEmpty()) {
 	            System.out.println("Account number not found among closed accounts.");
@@ -834,6 +835,7 @@ public class App {
 
 	        Account selectedAccount = selectedAccountOpt.get();
 	        selectedAccount.setActive(true);
+	        selectedAccount.setClosureRequested(false); // ← ESSENCIAL para reativação completa
 	        accountDAO.update(selectedAccount);
 
 	        String details = String.format("Reactivated account %s for client %s (CPF: %s)", 
@@ -849,10 +851,10 @@ public class App {
 	            selectedAccount
 	        );
 
-	        System.out.println("Account " + selectedAccount.getAccountNumber() + " successfully reactivated.");
+	        System.out.println("✅ Account " + selectedAccount.getAccountNumber() + " successfully reactivated.");
 
 	    } catch (Exception e) {
-	        System.err.println("Error reactivating account: " + e.getMessage());
+	        System.err.println("❌ Error reactivating account: " + e.getMessage());
 	        AuditService.logAction(
 	            "ACCOUNT_REACTIVATION_FAILED",
 	            "Failed to reactivate account: " + e.getMessage(),
@@ -862,6 +864,7 @@ public class App {
 	        );
 	    }
 	}
+
 
 	public static void unlockClient(Scanner scanner, Manager currentManager) {
 	    try (ClientDAO clientDAO = new ClientDAO()) {
@@ -1002,56 +1005,82 @@ public class App {
 	        String notes = scanner.nextLine().trim();
 
 	        // Process decision
-	        try (AccountDAO accountDAO = new AccountDAO();
-	             TransactionDAO transactionDAO = new TransactionDAO()) {
-
-	            EntityTransaction tx = accountDAO.beginTransaction();
+	        if (decision == 1) {
+	            // APPROVE LOGIC
+	            EntityTransaction tx = null;
 	            try {
-	                if (decision == 1) {
-	                    // APPROVE LOGIC
-	                    Account sender = accountDAO.findById(transaction.getSourceAccount().getId());
-	                    Account receiver = accountDAO.findById(transaction.getTargetAccount().getId());
+	                tx = reversalService.getEntityManager().getTransaction();
+	                tx.begin();
 
-	                    if (receiver.getBalance() < transaction.getAmount()) {
-	                        System.out.println("❌ Reversal failed: insufficient funds in target account.");
-	                        return;
-	                    }
+	                // Get accounts with fresh state
+	                Account sender = reversalService.getEntityManager().find(
+	                    Account.class, transaction.getSourceAccount().getId());
+	                Account receiver = reversalService.getEntityManager().find(
+	                    Account.class, transaction.getTargetAccount().getId());
 
-	                    // Update balances
-	                    receiver.setBalance(receiver.getBalance() - transaction.getAmount());
-	                    sender.setBalance(sender.getBalance() + transaction.getAmount());
+	                // Validate funds
+	                if (receiver.getBalance() < transaction.getAmount()) {
+	                    System.out.println("❌ Reversal failed: insufficient funds in target account.");
+	                    tx.rollback();
+	                    return;
+	                }
 
-	                    // Update transaction status
-	                    transaction.setIsReversible(false);
+	                // Update balances
+	                receiver.setBalance(receiver.getBalance() - transaction.getAmount());
+	                sender.setBalance(sender.getBalance() + transaction.getAmount());
+	                transaction.setIsReversible(false);
 
-	                    // Persist changes
-	                    accountDAO.update(receiver);
-	                    accountDAO.update(sender);
-	                    transactionDAO.update(transaction);
+	                // Persist changes
+	                reversalService.getEntityManager().merge(receiver);
+	                reversalService.getEntityManager().merge(sender);
+	                reversalService.getEntityManager().merge(transaction);
 
-	                    // Update request status
-	                    reversalService.approveRequest(selected.getId(), manager, notes);
+	                // Update request status (using same transaction)
+	                reversalService.approveRequest(selected.getId(), manager, notes);
 
-	                    // Audit log
-	                    String auditMessage = String.format(
-	                        "Approved reversal of $%.2f from %s to %s. Notes: %s",
-	                        transaction.getAmount(),
-	                        receiver.getAccountNumber(),
-	                        sender.getAccountNumber(),
-	                        notes
-	                    );
-	                    AuditService.logAction(
-	                        "REVERSAL_APPROVED",
-	                        auditMessage,
-	                        LocalDateTime.now(),
-	                        manager,
-	                        sender
-	                    );
-	                    System.out.println("✅ Reversal approved and processed successfully!");
-
-	                } else {
-	                    // REJECT LOGIC
+	                // Audit log
+	                String auditMessage = String.format(
+	                    "Approved reversal of $%.2f from %s to %s. Notes: %s",
+	                    transaction.getAmount(),
+	                    receiver.getAccountNumber(),
+	                    sender.getAccountNumber(),
+	                    notes
+	                );
+	                AuditService.logAction(
+	                    "REVERSAL_APPROVED",
+	                    auditMessage,
+	                    LocalDateTime.now(),
+	                    manager,
+	                    sender
+	                );
+	                
+	                tx.commit();
+	                System.out.println("✅ Reversal approved and processed successfully!");
+	            } catch (Exception e) {
+	                if (tx != null && tx.isActive()) {
+	                    tx.rollback();
+	                }
+	                System.err.println("❌ Error processing reversal: " + e.getMessage());
+	                AuditService.logAction(
+	                    "REVERSAL_PROCESSING_ERROR",
+	                    "Failed to process reversal: " + e.getMessage(),
+	                    LocalDateTime.now(),
+	                    manager,
+	                    null
+	                );
+	            }
+	        } else {
+	            // REJECT LOGIC
+	            try {
+	                EntityTransaction tx = reversalService.getEntityManager().getTransaction();
+	                try {
+	                    tx.begin();
 	                    reversalService.rejectRequest(selected.getId(), manager, notes);
+	                    tx.commit();
+	                    
+	                    System.out.println("✅ Reversal request rejected.");
+	                    
+	                    // Audit log
 	                    AuditService.logAction(
 	                        "REVERSAL_REJECTED",
 	                        String.format("Rejected reversal of TXN#%d ($%.2f). Reason: %s",
@@ -1062,15 +1091,24 @@ public class App {
 	                        manager,
 	                        transaction.getSourceAccount()
 	                    );
-	                    System.out.println("✅ Reversal request rejected.");
+	                } catch (Exception e) {
+	                    if (tx.isActive()) {
+	                        tx.rollback();
+	                    }
+	                    System.err.println("❌ Error rejecting reversal: " + e.getMessage());
+	                    AuditService.logAction(
+	                        "REVERSAL_REJECTION_ERROR",
+	                        "Failed to reject reversal: " + e.getMessage(),
+	                        LocalDateTime.now(),
+	                        manager,
+	                        null
+	                    );
 	                }
-	                tx.commit();
 	            } catch (Exception e) {
-	                if (tx.isActive()) tx.rollback();
-	                System.err.println("❌ Error processing reversal: " + e.getMessage());
+	                System.err.println("❌ System error: " + e.getMessage());
 	                AuditService.logAction(
-	                    "REVERSAL_PROCESSING_ERROR",
-	                    "Failed to process reversal: " + e.getMessage(),
+	                    "REVERSAL_REJECTION_ERROR",
+	                    "System error during rejection: " + e.getMessage(),
 	                    LocalDateTime.now(),
 	                    manager,
 	                    null
@@ -1159,13 +1197,17 @@ public class App {
 
 	        // Process action
 	        try {
-	            if (action == 1) {
-	                requestService.approveRequest(selectedRequest, manager);
-	                System.out.println("\n✅ Request approved and account deactivated.");
-	            } else {
-	                requestService.rejectRequest(selectedRequest, manager);
-	                System.out.println("\n✅ Request rejected.");
-	            }
+	        	if (action == 1) {
+	        	    System.out.print("Enter approval notes: ");
+	        	    String notes = scanner.nextLine();
+	        	    requestService.approveRequest(selectedRequest, manager, notes);
+	        	    System.out.println("\n✅ Request approved and account deactivated.");
+	        	} else {
+	        	    System.out.print("Enter rejection reason: ");
+	        	    String reason = scanner.nextLine();
+	        	    requestService.rejectRequest(selectedRequest, manager, reason);
+	        	    System.out.println("\n✅ Request rejected.");
+	        	}
 	        } catch (Exception e) {
 	            System.err.println("\n❌ Error processing request: " + e.getMessage());
 	            AuditService.logAction(
@@ -1325,9 +1367,16 @@ public class App {
 	                            System.out.println("Transfer amount must be greater than zero.");
 	                            break;
 	                        }
+	                        
+	                        
 
 	                        try (AccountDAO accountDAO = new AccountDAO();
 	                             TransactionDAO transactionDAO = new TransactionDAO()) {
+	                        	EntityTransaction tx = accountDAO.beginTransaction();
+	                        	if (tx == null) {
+	                                System.err.println("❌ Failed to start database transaction");
+	                                return;
+	                            }
 	                            
 	                            Account destination = accountDAO.findByAccountNumber(destAccountNumber);
 
@@ -1384,18 +1433,35 @@ public class App {
 	                    break;
 	                case 6:
 	                    System.out.print("\nAre you sure you want to close this account? (Y/N): ");
-	                    String confirm = scanner.nextLine();
+	                    String confirm = scanner.nextLine().trim();
+	                    
 	                    if (confirm.equalsIgnoreCase("Y")) {
-	                        try (AccountDAO accountDAO = new AccountDAO()) {
-	                            if (!account.getClosureRequested()) {
+	                        System.out.print("Enter the reason for closing the account: ");
+	                        String reason = scanner.nextLine().trim();
+	                        
+	                        try {
+	                            // Create request outside the try-with-resources to maintain transaction
+	                            AccountInactivationRequest request = new AccountInactivationRequest();
+	                            request.setAccount(account);
+	                            request.setRequester(client);
+	                            request.setReason(reason);
+	                            request.setStatus(RequestStatus.PENDING);
+	                            request.setRequestDate(LocalDateTime.now());
+	                            
+	                            // Explicit service handling
+	                            try (InactivationRequestService service = new InactivationRequestService()) {
+	                                service.createRequest(request);
 	                                account.setClosureRequested(true);
-	                                accountDAO.update(account);
-	                                AuditService.logAction("ACCOUNT_CLOSURE_REQUESTED", "Client requested account closure.",
-	                                        LocalDateTime.now(), client, account);
-	                                System.out.println("Account closure request submitted.");
-	                            } else {
-	                                System.out.println("Account has pending closure request\n");
+	                                System.out.println("✅ Account closure request submitted successfully!");
 	                            }
+	                            
+	                            // Add brief pause and clear buffer
+	                            Thread.sleep(500);
+	                            break; // Explicitly break out of the menu loop
+	                        } catch (Exception e) {
+	                            System.out.println("❌ Error submitting request: " + e.getMessage());
+	                            // Consume any remaining input
+	                            scanner.nextLine();
 	                        }
 	                    } else {
 	                        System.out.println("Operation cancelled.");
@@ -1475,6 +1541,7 @@ public class App {
 	                                    }
 	                                }
 	                                break;
+	                            
 	                            case 0:
 	                                System.out.println("Leaving extract visualization option...\n");
 	                                break;

@@ -8,7 +8,7 @@ public class JpaConfig {
     private static final EntityManagerFactory emf;
     
     static {
-        emf = Persistence.createEntityManagerFactory("your-persistence-unit-name");
+        emf = Persistence.createEntityManagerFactory("PersistenceUnit");
     }
     
     public static EntityManager getEntityManager() {
