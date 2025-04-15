@@ -1,4 +1,4 @@
-![Imagem do WhatsApp de 2025-04-14 à(s) 14 17 15_17faa3be](https://github.com/user-attachments/assets/8e924f4b-7185-4a29-a5f1-9dc226b2d866)
+![Imagem do WhatsApp de 2025-04-15 à(s) 10 06 28_9b5fefef](https://github.com/user-attachments/assets/80db2d01-42b3-4b43-98aa-cc516c7d5baa)
 
 # Sistema Bancário - Desafio Compass
 
@@ -37,7 +37,7 @@ Sistema bancário completo com:
 4. Transferir Fundos
 5. Solicitar Estorno de Transação
 6. Solicitar Encerramento de Conta
-7. Visualizar Extrato da Conta
+7. Visualizar Extrato da Conta (Opcional: exportação de .csv)
 
 ### Menu de Logs
 1. Visualizar Todos os Logs
@@ -51,7 +51,7 @@ Sistema bancário completo com:
 0. Voltar ao Menu Principal
 
 ## Tecnologias Utilizadas
-- Java 17
+- Java 22
 - Hibernate 6.4.6.Final
 - MySQL 8.0.33
 - JUnit 4.13.2 (para testes)
