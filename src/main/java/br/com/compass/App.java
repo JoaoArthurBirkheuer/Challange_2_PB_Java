@@ -157,7 +157,7 @@ public class App {
 	            }
 	            cpfValid = true;
 	        } catch (Exception e) {
-	            System.out.println("Error verifying CPF: " + e.getMessage());
+	            System.out.println("Error: This CPF is already registered!");
 	        }
 	    }
 

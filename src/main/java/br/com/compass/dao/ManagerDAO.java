@@ -7,19 +7,23 @@ import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 
-public class ManagerDAO implements AutoCloseable{
-	
-	private final EntityManager em;
-	
-	public ManagerDAO() {
-		this.em = JpaConfig.getEntityManager();
-	}
+public class ManagerDAO implements AutoCloseable {
 
-	public EntityTransaction beginTransaction() {
-        return em.getTransaction();
+    private final EntityManager em;
+
+    public ManagerDAO() {
+        this.em = JpaConfig.getEntityManager();
     }
-	public Manager findByCpf(String cpf) {
-       
+
+    public EntityTransaction beginTransaction() {
+        EntityTransaction tx = em.getTransaction();
+        if (!tx.isActive()) {
+            tx.begin();
+        }
+        return tx;
+    }
+
+    public Manager findByCpf(String cpf) {
         try {
             TypedQuery<Manager> query = em.createQuery(
                 "SELECT m FROM Manager m WHERE m.cpf = :cpf", Manager.class);
@@ -27,92 +31,50 @@ public class ManagerDAO implements AutoCloseable{
             return query.getSingleResult();
         } catch (NoResultException e) {
             return null;
-        } finally {
-            em.close();
         }
     }
 
     public boolean existsByCpf(String cpf) {
-        try {
-            TypedQuery<Long> query = em.createQuery(
-                "SELECT COUNT(m) FROM Manager m WHERE m.cpf = :cpf", Long.class);
-            query.setParameter("cpf", cpf);
-            return query.getSingleResult() > 0;
-        } finally {
-            em.close();
-        }
+        TypedQuery<Long> query = em.createQuery(
+            "SELECT COUNT(m) FROM Manager m WHERE m.cpf = :cpf", Long.class);
+        query.setParameter("cpf", cpf);
+        return query.getSingleResult() > 0;
     }
 
     public boolean existsClientWithSameCpf(String cpf) {
-        try {
-            TypedQuery<Long> query = em.createQuery(
-                "SELECT COUNT(c) FROM Client c WHERE c.cpf = :cpf", Long.class);
-            query.setParameter("cpf", cpf);
-            return query.getSingleResult() > 0;
-        } finally {
-            em.close();
-        }
+        TypedQuery<Long> query = em.createQuery(
+            "SELECT COUNT(c) FROM Client c WHERE c.cpf = :cpf", Long.class);
+        query.setParameter("cpf", cpf);
+        return query.getSingleResult() > 0;
     }
 
+    // Métodos ajustados para não controlar transação:
+    
     public void update(Manager manager) {
-        try {
-            em.getTransaction().begin();
-            em.merge(manager);
-            em.getTransaction().commit();
-        } catch (Exception e) {
-            em.getTransaction().rollback();
-            throw new RuntimeException("Failed to update manager: " + e.getMessage(), e);
-        } finally {
-            em.close();
-        }
+        em.merge(manager);
     }
 
     public void save(Manager manager) {
-        try {
-            em.getTransaction().begin();
-            em.persist(manager);
-            em.getTransaction().commit();
-        } catch (Exception e) {
-            em.getTransaction().rollback();
-            throw new RuntimeException("Failed to save manager: " + e.getMessage(), e);
-        } finally {
-            em.close();
-        }
+        em.persist(manager);
     }
 
     public void delete(Manager manager) {
-        try {
-            em.getTransaction().begin();
-            Manager managedManager = em.merge(manager);
-            em.remove(managedManager);
-            em.getTransaction().commit();
-        } catch (Exception e) {
-            em.getTransaction().rollback();
-            throw new RuntimeException("Failed to delete manager: " + e.getMessage(), e);
-        } finally {
+        Manager managedManager = em.merge(manager);
+        em.remove(managedManager);
+    }
+
+    public void createManager(Manager newManager) {
+        em.persist(newManager); // mesma função do save()
+    }
+
+    public EntityManager getEntityManager() {
+        return em;
+    }
+
+    @Override
+    public void close() {
+        if (em != null && em.isOpen()) {
             em.close();
         }
     }
-
-	public void createManager(Manager newManager) {
-        try {
-        	em.getTransaction().begin();
-            em.persist(newManager);
-            em.getTransaction().commit();
-            // System.out.println("Client registered successfully!");
-        } catch (Exception e) {
-            if (em.getTransaction().isActive()) em.getTransaction().rollback();
-            throw new RuntimeException("Failed to register client: " + e.getMessage(), e);
-        } finally {
-            em.close();
-        }
-	}
-
-	@Override
-	public void close() throws Exception {
-		
-		if (em != null && em.isOpen()) {
-            em.close();
-        }
-	}
 }
