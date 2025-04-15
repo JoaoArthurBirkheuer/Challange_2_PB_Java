@@ -13,10 +13,8 @@ Sistema bancário completo com:
 
 ### Menu Principal
 1. Login (auto-detecta cliente/gerente)
-2. Criação de conta de 
+2. Criação de conta de Cliente
 3. Audit Log System
----
-0.Exit
 
 ### Menu do Gerente
 1. Registrar Novo Gerente
@@ -24,8 +22,6 @@ Sistema bancário completo com:
 3. Revisar Solicitações de Estorno
 4. Solicitações de Inativação de Conta
 5. Reativação de Conta
----
-0. Logout
 
 ### Menu do Cliente
 - Lista contas ativas com:
@@ -42,7 +38,6 @@ Sistema bancário completo com:
 5. Solicitar Estorno de Transação
 6. Solicitar Encerramento de Conta
 7. Visualizar Extrato da Conta
-0. Voltar para Contas
 
 ### Menu de Logs
 1. Visualizar Todos os Logs
