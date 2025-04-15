@@ -25,17 +25,14 @@ public class AuthService implements AutoCloseable {
     }
 
     public LoginType checkLoginType(String cpf) {
-        try {
             boolean isClient = userDAO.findClientByCpf(cpf) != null;
             boolean isManager = userDAO.findManagerByCpf(cpf) != null;
             
             if (isClient && isManager) return LoginType.BOTH;
             if (isClient) return LoginType.CLIENT_ONLY;
             if (isManager) return LoginType.MANAGER_ONLY;
+            else System.out.println("Failed to check login type");
             return null;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to check login type", e);
-        }
     }
 
     public User login(String cpf, String password, LoginType loginType) {

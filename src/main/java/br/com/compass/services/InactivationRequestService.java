@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import br.com.compass.config.JpaConfig;
-import br.com.compass.dao.AuditLogDAO;
 import br.com.compass.dao.InactivationRequestDAO;
 import br.com.compass.model.Account;
 import br.com.compass.model.AccountInactivationRequest;
@@ -51,8 +50,7 @@ public class InactivationRequestService implements AutoCloseable {
             account.setActive(false);
             em.merge(managedRequest);
             em.merge(account);
-            
-            // Log the action
+           
             AuditService.logAction(
                 "ACCOUNT_CLOSURE_APPROVED",
                 String.format("Account %s closed by manager", account.getAccountNumber()),
@@ -132,8 +130,6 @@ public class InactivationRequestService implements AutoCloseable {
             tx = em.getTransaction();
             tx.begin();
             
-
-            // Verify account exists and is active
             Account account = em.find(Account.class, request.getAccount().getId());
             if (account == null) {
                 throw new RuntimeException("Account not found");
@@ -143,7 +139,6 @@ public class InactivationRequestService implements AutoCloseable {
                 throw new RuntimeException("Account is already inactive");
             }
 
-            // Check for existing requests
             boolean exists = em.createQuery(
                     "SELECT COUNT(r) FROM AccountInactivationRequest r " +
                     "WHERE r.account = :account AND r.status = 'PENDING'", 
@@ -155,21 +150,15 @@ public class InactivationRequestService implements AutoCloseable {
                 throw new RuntimeException("This account already has a pending closure request");
             }
             
-            // Set required fields
             request.setRequestDate(LocalDateTime.now());
             request.setStatus(RequestStatus.PENDING);
             
-            
-            // Persist the request
             em.persist(request);
             
-            
-            // Update account status
             account.setClosureRequested(true);
             em.merge(account);
             
             tx.commit();
-            // Audit log
             AuditService.logAction(
                 "ACCOUNT_CLOSURE_REQUESTED",
                 String.format("Requested closure for account %s. Reason: %s",
@@ -181,17 +170,9 @@ public class InactivationRequestService implements AutoCloseable {
             );
         } catch (Exception e) {
             if (tx != null && tx.isActive()) {
-                tx.rollback();
+              tx.rollback();
             }
             throw new RuntimeException("Failed to create closure request: " + e.getMessage(), e);
         }
-    }
-    
-    private AccountInactivationRequest getManagedRequest(Long requestId) {
-        AccountInactivationRequest request = em.find(AccountInactivationRequest.class, requestId);
-        if (request == null) {
-            throw new RuntimeException("Inactivation request not found");
-        }
-        return request;
     }
 }

@@ -58,4 +58,13 @@ public class ReversalRequestDAO implements AutoCloseable {
             .getSingleResult();
         return count > 0;
     }
+    
+    public boolean hasApprovedReversalForTransaction(Transaction transaction) {
+        Long count = em.createQuery(
+            "SELECT COUNT(r) FROM ReversalRequest r " +
+            "WHERE r.transaction = :transaction AND r.status = 'APPROVED'", Long.class)
+            .setParameter("transaction", transaction)
+            .getSingleResult();
+        return count > 0;
+    }
 }

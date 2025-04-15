@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.InputMismatchException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Scanner;
@@ -19,11 +20,9 @@ import br.com.compass.dao.AuditLogDAO;
 import br.com.compass.dao.ClientDAO;
 import br.com.compass.dao.ManagerDAO;
 import br.com.compass.dao.ReversalRequestDAO;
-//import br.com.compass.dao.ReversalRequestDAO;
 import br.com.compass.dao.TransactionDAO;
 import br.com.compass.dao.UserDAO;
 import br.com.compass.exceptions.BusinessException;
-// import br.com.compass.exceptions.BusinessRuleException;
 import br.com.compass.model.Account;
 import br.com.compass.model.AccountInactivationRequest;
 import br.com.compass.model.AuditLog;
@@ -47,24 +46,13 @@ import jakarta.persistence.EntityTransaction;
 
 public class App {
 
-	/// TO GO TO MAIN MENU TYPE 000
-	/// TO GO TO CLIENT MENU TYPE 111
-	/// TO GO TO MANAGER MENU TYPE 222
-	/// TO GO TO LOGIN MENU TYPE 333
-	/// TO GO TO MANAGER REGISTRATION MENU TYPE 444
-	/// TO GO TO CLIENT REGISTRATION MENU TYPE 555
-	/// TO GO TO ACCOUNT MENU TYPE 666
-	/// TO GO TO TRANSFER-MENU, TYPE 777
-	/// TO GO TO REVERSAL REQUEST MENU, TYPE 888
-	/// TO GO TO ACCOUNT INACTIVATION MENU, TYPE 999
 	private static UserDAO userDAO = new UserDAO();
 	private static final AccountDAO accountDAO = new AccountDAO();
-	//private static final ReversalRequestDAO reversalRequestDAO = new ReversalRequestDAO();
 	private static final AccountService as = new AccountService(accountDAO);
-	//private static final ClientDAO clientDAO = new ClientDAO();
 	private static final ReversalService reversalService = new ReversalService();
 
 	public static void main(String[] args) {
+		Locale.setDefault(Locale.US);
 		br.com.compass.config.DataSeeder.seed();
 		Scanner scanner = new Scanner(System.in);
 		mainMenu(scanner);
@@ -72,7 +60,6 @@ public class App {
 		System.out.println("Application closed");
 	}
 
-	// 000
 	public static void mainMenu(Scanner scanner) {
 		boolean running = true;
 
@@ -115,17 +102,14 @@ public class App {
 		}
 	}
 
-	/// 555
 	private static void registerClient(Scanner scanner) {
-	    // 1. Initialize all variables
 	    String name = null;
 	    String cpf = null;
 	    LocalDate birthDate = null;
 	    String phone = null;
 	    AccountType accountType = null;
 	    String password = null;
-	    
-	    // 2. Name Validation
+
 	    System.out.println("\n=== NEW CLIENT REGISTRATION === (Enter '0' at any time to cancel)");
 	    boolean nameValid = false;
 	    while (!nameValid) {
@@ -146,7 +130,6 @@ public class App {
 	        }
 	    }
 
-	    // 3. CPF Validation
 	    boolean cpfValid = false;
 	    while (!cpfValid) {
 	        System.out.print("\nCPF (format: XXX.XXX.XXX-XX): ");
@@ -157,19 +140,16 @@ public class App {
 	            return;
 	        }
 
-	        // Format validation
 	        if (!cpf.matches("\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}")) {
 	            System.out.println("Error: Invalid CPF format! Please use XXX.XXX.XXX-XX pattern.");
 	            continue;
 	        }
 
-	        // Digit validation
 	        if (!CPFValidator.isValidCPF(cpf)) {
 	            System.out.println("Error: Invalid CPF number! Please check the digits.");
 	            continue;
 	        }
 
-	        // Uniqueness check
 	        try (ClientDAO tempClientDAO = new ClientDAO()) {
 	            if (tempClientDAO.findByCpf(cpf) != null) {
 	                System.out.println("Error: This CPF is already registered!");
@@ -181,7 +161,6 @@ public class App {
 	        }
 	    }
 
-	    // 4. Birth Date Validation
 	    boolean dateValid = false;
 	    while (!dateValid) {
 	        System.out.print("\nBirth Date (DD/MM/YYYY): ");
@@ -206,7 +185,6 @@ public class App {
 	        }
 	    }
 
-	    // 5. Phone Validation
 	    boolean phoneValid = false;
 	    while (!phoneValid) {
 	        System.out.print("\nPhone Number (with area code): ");
@@ -218,14 +196,13 @@ public class App {
 	        }
 
 	        String digitsOnly = phone.replaceAll("[^0-9]", "");
-	        if (digitsOnly.length() < 11) {  // Brazil standard with DDD
+	        if (digitsOnly.length() < 11) {
 	            System.out.println("Error: Phone must have at least 11 digits (including area code)!");
 	        } else {
 	            phoneValid = true;
 	        }
 	    }
 
-	    // 6. Account Type Selection
 	    boolean typeValid = false;
 	    while (!typeValid) {
 	        System.out.println("\nSelect Account Type:");
@@ -260,7 +237,6 @@ public class App {
 	        }
 	    }
 
-	    // 7. Password Validation
 	    boolean passwordValid = false;
 	    while (!passwordValid) {
 	        System.out.print("\nCreate Password (min 8 chars, 1 number, 1 special char): ");
@@ -295,7 +271,6 @@ public class App {
 	        }
 	    }
 
-	    // 8. Final Confirmation
 	    System.out.println("\n=== REGISTRATION SUMMARY ===");
 	    System.out.println("Name: " + name);
 	    System.out.println("CPF: " + cpf);
@@ -312,7 +287,7 @@ public class App {
 
 	    // 9. Database Operations
 	    try {
-	        // Create objects first
+	       
 	        Client newClient = new Client();
 	        newClient.setName(name);
 	        newClient.setCpf(cpf);
@@ -330,11 +305,9 @@ public class App {
 	        newAccount.setActive(true);
 	        newAccount.setType(accountType);
 
-	        // Use a single DAO with proper transaction management
 	        try (ClientDAO clientDAO = new ClientDAO()) {
 	            EntityManager em = clientDAO.getEntityManager();
 	            
-	            // Check if transaction is already active
 	            if (em.getTransaction().isActive()) {
 	                em.getTransaction().rollback();
 	            }
@@ -342,18 +315,14 @@ public class App {
 	            EntityTransaction tx = em.getTransaction();
 	            try {
 	                tx.begin();
-	                
-	                // Persist client
 	                em.persist(newClient);
-	                em.flush(); // Ensure client gets ID
+	                em.flush(); 
 	                
-	                // Persist account
-	                newAccount.setOwner(newClient); // Ensure relationship
+	                newAccount.setOwner(newClient);
 	                em.persist(newAccount);
 	                
 	                tx.commit();
 
-	                // Audit Log
 	                AuditService.logAction(
 	                    "ACCOUNT_CREATION",
 	                    String.format("New %s account created for %s", accountType, name),
@@ -362,7 +331,7 @@ public class App {
 	                    newAccount
 	                );
 
-	                System.out.println("\n✅ Registration successful!");
+	                System.out.println("\nRegistration successful!");
 	                System.out.println("Account Number: " + newAccount.getAccountNumber());
 	                System.out.println("Initial Balance: $0.00");
 
@@ -377,23 +346,20 @@ public class App {
 	                    null,
 	                    null
 	                );
-	                System.out.println("❌ Registration failed: " + e.getMessage());
+	                System.out.println("Registration failed: " + e.getMessage());
 	            }
 	        }
 	    } catch (Exception e) {
-	        System.out.println("❌ System error: " + e.getMessage());
+	        System.out.println("System error: " + e.getMessage());
 	    }
 	}
 
-	/// 444
 	private static void registerManager(Scanner scanner, Manager manager) {
-	    // 1. Authorization Check
 	    if (manager.getId() != 1) {
 	        System.out.println("Only Super Manager can register new managers");
 	        return;
 	    }
 
-	    // 2. Initialization
 	    System.out.println("\n=== NEW MANAGER REGISTRATION === (Enter '0' at any time to cancel)");
 	    String name = null;
 	    String cpf = null;
@@ -401,7 +367,6 @@ public class App {
 	    String phone = null;
 	    String password = null;
 
-	    // 3. Name Validation
 	    boolean nameValid = false;
 	    while (!nameValid) {
 	        System.out.print("\nFull Name (minimum 3 characters): ");
@@ -421,7 +386,6 @@ public class App {
 	        }
 	    }
 
-	    // 4. CPF Validation
 	    boolean cpfValid = false;
 	    while (!cpfValid) {
 	        System.out.print("\nCPF (format: XXX.XXX.XXX-XX): ");
@@ -432,19 +396,16 @@ public class App {
 	            return;
 	        }
 
-	        // Format validation
 	        if (!cpf.matches("\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}")) {
 	            System.out.println("Error: Invalid CPF format! Please use XXX.XXX.XXX-XX pattern.");
 	            continue;
 	        }
-
-	        // Digit validation
+	       
 	        if (!CPFValidator.isValidCPF(cpf)) {
 	            System.out.println("Error: Invalid CPF number! Please check the digits.");
 	            continue;
 	        }
 
-	        // Uniqueness check
 	        try (ManagerDAO tempManagerDAO = new ManagerDAO()) {
 	            if (tempManagerDAO.findByCpf(cpf) != null) {
 	                System.out.println("Error: This CPF is already registered!");
@@ -456,7 +417,6 @@ public class App {
 	        }
 	    }
 
-	    // 5. Birth Date Validation
 	    boolean dateValid = false;
 	    while (!dateValid) {
 	        System.out.print("\nBirth Date (DD/MM/YYYY): ");
@@ -481,7 +441,6 @@ public class App {
 	        }
 	    }
 
-	    // 6. Phone Validation
 	    boolean phoneValid = false;
 	    while (!phoneValid) {
 	        System.out.print("\nPhone Number (with area code): ");
@@ -493,14 +452,13 @@ public class App {
 	        }
 
 	        String digitsOnly = phone.replaceAll("[^0-9]", "");
-	        if (digitsOnly.length() < 11) {  // Brazil standard with DDD
+	        if (digitsOnly.length() < 11) {  
 	            System.out.println("Error: Phone must have at least 11 digits (including area code)!");
 	        } else {
 	            phoneValid = true;
 	        }
 	    }
 
-	    // 7. Password Validation
 	    boolean passwordValid = false;
 	    while (!passwordValid) {
 	        System.out.print("\nCreate Password (min 8 chars, 1 number, 1 special char): ");
@@ -535,7 +493,6 @@ public class App {
 	        }
 	    }
 
-	    // 8. Final Confirmation
 	    System.out.println("\n=== REGISTRATION SUMMARY ===");
 	    System.out.println("Name: " + name);
 	    System.out.println("CPF: " + cpf);
@@ -549,7 +506,7 @@ public class App {
 	        return;
 	    }
 
-	    // 9. Database Operations
+	    // Database Operations
 	    try (ManagerDAO managerDAO = new ManagerDAO()) {
 	        EntityTransaction tx = managerDAO.beginTransaction();
 	        try {
@@ -577,7 +534,7 @@ public class App {
 	                null
 	            );
 
-	            System.out.println("\n✅ Registration successful!");
+	            System.out.println("\nRegistration successful!");
 
 	        } catch (Exception e) {
 	            if (tx.isActive()) tx.rollback();
@@ -588,44 +545,46 @@ public class App {
 	                null,
 	                null
 	            );
-	            System.out.println("❌ Registration failed: " + e.getMessage());
+	            System.out.println("Registration failed: " + e.getMessage());
 	        }
 	    } catch (Exception e) {
-	        System.out.println("❌ System error: " + e.getMessage());
+	        System.out.println("System error: " + e.getMessage());
 	    }
 	}
 
 	private static String generateAccountNumber() {
 		return String.format("%08d", new Random().nextInt(100000000));
 	}
-
-	/// 333
+	
+	
 	public static void loginMenu(Scanner scanner) {
-		System.out.print("\n>> Enter CPF: ");
-		String cpf = scanner.nextLine();
+	    System.out.print("\n>> Enter CPF: ");
+	    String cpf = scanner.nextLine();
 
-		AuthService authService = new AuthService(userDAO);
-		AuthService.LoginType loginType = authService.checkLoginType(cpf);
+	    try (AuthService authService = new AuthService(userDAO)) {
+	        AuthService.LoginType loginType = authService.checkLoginType(cpf);
 
-		if (loginType == null) {
-			System.out.println("CPF not registered in the system.");
-			AuditService.logAction("LOGIN_ATTEMPT", "Failed login - CPF not found", LocalDateTime.now(), null, null);
-			// return;
-		}
+	        if (loginType == null) {
+	            System.out.println("CPF not registered in the system.");
+	            AuditService.logAction("LOGIN_ATTEMPT", "Failed login - CPF not found", LocalDateTime.now(), null, null);
+	            return;
+	        }
 
-		switch (loginType) {
-		case MANAGER_ONLY:
-			handleManagerLogin(scanner, authService, cpf);
-			break;
-		case CLIENT_ONLY:
-			handleClientLogin(scanner, authService, cpf);
-			break;
-		case BOTH:
-			handleDualRoleLogin(scanner, authService, cpf);
-			break;
-		}
+	        switch (loginType) {
+	            case MANAGER_ONLY:
+	                handleManagerLogin(scanner, authService, cpf);
+	                break;
+	            case CLIENT_ONLY:
+	                handleClientLogin(scanner, authService, cpf);
+	                break;
+	            case BOTH:
+	                handleDualRoleLogin(scanner, authService, cpf);
+	                break;
+	        }
+	    }
 	}
 
+	/// STEP 1.1
 	private static void handleManagerLogin(Scanner scanner, AuthService authService, String cpf) {
 	    try (UserDAO userDAO = new UserDAO()) {
 	        System.out.print(">> Enter manager password: ");
@@ -651,6 +610,7 @@ public class App {
 	    }
 	}
 
+	// STEP 1.2
 	private static void handleClientLogin(Scanner scanner, AuthService authService, String cpf) {
 	    try (UserDAO userDAO = new UserDAO()) {
 	        Client client = (Client) userDAO.findClientByCpf(cpf);
@@ -698,6 +658,7 @@ public class App {
 	    }
 	}
 
+	/// STEP 1.3
 	private static void handleDualRoleLogin(Scanner scanner, AuthService authService, String cpf) {
 	    try {
 	        System.out.println("\nThis CPF is registered as both Manager and Client.");
@@ -742,7 +703,6 @@ public class App {
 	    }
 	}
 
-	/// 222
 	public static void managerMenu(Scanner scanner, Manager manager) {
 		boolean running = true;
 		while (running) {
@@ -835,7 +795,7 @@ public class App {
 
 	        Account selectedAccount = selectedAccountOpt.get();
 	        selectedAccount.setActive(true);
-	        selectedAccount.setClosureRequested(false); // ← ESSENCIAL para reativação completa
+	        selectedAccount.setClosureRequested(false);
 	        accountDAO.update(selectedAccount);
 
 	        String details = String.format("Reactivated account %s for client %s (CPF: %s)", 
@@ -843,28 +803,16 @@ public class App {
 	            selectedAccount.getOwner().getName(),
 	            selectedAccount.getOwner().getCpf());
 
-	        AuditService.logAction(
-	            "ACCOUNT_REACTIVATED", 
-	            details, 
-	            LocalDateTime.now(), 
-	            manager, 
-	            selectedAccount
-	        );
+	        AuditService.logAction("ACCOUNT_REACTIVATED", details, LocalDateTime.now(),manager, selectedAccount);
 
-	        System.out.println("✅ Account " + selectedAccount.getAccountNumber() + " successfully reactivated.");
+	        System.out.println("Account " + selectedAccount.getAccountNumber() + " successfully reactivated.");
 
 	    } catch (Exception e) {
-	        System.err.println("❌ Error reactivating account: " + e.getMessage());
-	        AuditService.logAction(
-	            "ACCOUNT_REACTIVATION_FAILED",
-	            "Failed to reactivate account: " + e.getMessage(),
-	            LocalDateTime.now(),
-	            manager,
-	            null
-	        );
+	        System.err.println("Error reactivating account: " + e.getMessage());
+	        AuditService.logAction("ACCOUNT_REACTIVATION_FAILED","Failed to reactivate account: " + e.getMessage(),
+	            LocalDateTime.now(),manager,null);
 	    }
 	}
-
 
 	public static void unlockClient(Scanner scanner, Manager currentManager) {
 	    try (ClientDAO clientDAO = new ClientDAO()) {
@@ -890,13 +838,8 @@ public class App {
 	            accountChoice = Integer.parseInt(scanner.nextLine());
 	        } catch (NumberFormatException e) {
 	            System.out.println("Invalid input. Operation cancelled.");
-	            AuditService.logAction(
-	                "CLIENT_UNLOCK_ATTEMPT",
-	                "Invalid input format for client selection",
-	                LocalDateTime.now(),
-	                currentManager,
-	                null
-	            );
+	            AuditService.logAction("CLIENT_UNLOCK_ATTEMPT","Invalid input format for client selection",
+	                LocalDateTime.now(),currentManager,null);
 	            return;
 	        }
 
@@ -918,29 +861,17 @@ public class App {
 	        String details = String.format("Unlocked client %s (CPF: %s)", 
 	            selectedClient.getName(), selectedClient.getCpf());
 	        
-	        AuditService.logAction(
-	            "CLIENT_UNBLOCKED",
-	            details,
-	            LocalDateTime.now(),
-	            currentManager,
-	            null
-	        );
+	        AuditService.logAction("CLIENT_UNBLOCKED",details,LocalDateTime.now(),currentManager,null);
 
-	        System.out.printf("\n✅ Client %s (CPF: %s) has been successfully unlocked.\n", 
+	        System.out.printf("\nClient %s (CPF: %s) has been successfully unlocked.\n", 
 	            selectedClient.getName(), selectedClient.getCpf());
 
 	    } catch (Exception e) {
 	        System.err.println("Error unlocking client: " + e.getMessage());
-	        AuditService.logAction(
-	            "CLIENT_UNLOCK_FAILED",
-	            "Failed to unlock client: " + e.getMessage(),
-	            LocalDateTime.now(),
-	            currentManager,
-	            null
-	        );
+	        AuditService.logAction("CLIENT_UNLOCK_FAILED","Failed to unlock client: " + e.getMessage(),LocalDateTime.now(),
+	            currentManager,null);
 	    }
 	}
-	
 	public static void reviewReversalRequests(Scanner scanner, Manager manager, ReversalService reversalService) {
 	    try {
 	        List<ReversalRequest> pendingRequests = reversalService.findPendingRequests();
@@ -950,7 +881,6 @@ public class App {
 	            return;
 	        }
 
-	        // Display pending requests
 	        System.out.println("\nPending Reversal Requests:");
 	        for (int i = 0; i < pendingRequests.size(); i++) {
 	            ReversalRequest r = pendingRequests.get(i);
@@ -964,7 +894,6 @@ public class App {
 	                r.getReason());
 	        }
 
-	        // Get user selection
 	        System.out.print("\nSelect a request to review (0 to cancel): ");
 	        int choice;
 	        try {
@@ -985,7 +914,6 @@ public class App {
 	        ReversalRequest selected = pendingRequests.get(choice - 1);
 	        Transaction transaction = selected.getTransaction();
 
-	        // Get decision
 	        System.out.println("\n1. Approve");
 	        System.out.println("2. Reject");
 	        System.out.print("Choose an option: ");
@@ -1004,41 +932,34 @@ public class App {
 	        System.out.print("Resolution notes: ");
 	        String notes = scanner.nextLine().trim();
 
-	        // Process decision
 	        if (decision == 1) {
-	            // APPROVE LOGIC
+	            
 	            EntityTransaction tx = null;
 	            try {
 	                tx = reversalService.getEntityManager().getTransaction();
 	                tx.begin();
 
-	                // Get accounts with fresh state
 	                Account sender = reversalService.getEntityManager().find(
 	                    Account.class, transaction.getSourceAccount().getId());
 	                Account receiver = reversalService.getEntityManager().find(
 	                    Account.class, transaction.getTargetAccount().getId());
 
-	                // Validate funds
 	                if (receiver.getBalance() < transaction.getAmount()) {
-	                    System.out.println("❌ Reversal failed: insufficient funds in target account.");
+	                    System.out.println("Reversal failed: insufficient funds in target account.");
 	                    tx.rollback();
 	                    return;
 	                }
 
-	                // Update balances
 	                receiver.setBalance(receiver.getBalance() - transaction.getAmount());
 	                sender.setBalance(sender.getBalance() + transaction.getAmount());
 	                transaction.setIsReversible(false);
 
-	                // Persist changes
 	                reversalService.getEntityManager().merge(receiver);
 	                reversalService.getEntityManager().merge(sender);
 	                reversalService.getEntityManager().merge(transaction);
 
-	                // Update request status (using same transaction)
 	                reversalService.approveRequest(selected.getId(), manager, notes);
 
-	                // Audit log
 	                String auditMessage = String.format(
 	                    "Approved reversal of $%.2f from %s to %s. Notes: %s",
 	                    transaction.getAmount(),
@@ -1046,31 +967,20 @@ public class App {
 	                    sender.getAccountNumber(),
 	                    notes
 	                );
-	                AuditService.logAction(
-	                    "REVERSAL_APPROVED",
-	                    auditMessage,
-	                    LocalDateTime.now(),
-	                    manager,
-	                    sender
-	                );
+	                AuditService.logAction("REVERSAL_APPROVED",auditMessage,LocalDateTime.now(),manager,sender);
 	                
 	                tx.commit();
-	                System.out.println("✅ Reversal approved and processed successfully!");
+	                System.out.println("Reversal approved and processed successfully!");
 	            } catch (Exception e) {
 	                if (tx != null && tx.isActive()) {
 	                    tx.rollback();
 	                }
-	                System.err.println("❌ Error processing reversal: " + e.getMessage());
-	                AuditService.logAction(
-	                    "REVERSAL_PROCESSING_ERROR",
-	                    "Failed to process reversal: " + e.getMessage(),
-	                    LocalDateTime.now(),
-	                    manager,
-	                    null
-	                );
+	                System.err.println("Error processing reversal: " + e.getMessage());
+	                AuditService.logAction("REVERSAL_PROCESSING_ERROR","Failed to process reversal: " + e.getMessage(),
+	                    LocalDateTime.now(),manager,null);
 	            }
 	        } else {
-	            // REJECT LOGIC
+	           
 	            try {
 	                EntityTransaction tx = reversalService.getEntityManager().getTransaction();
 	                try {
@@ -1078,70 +988,44 @@ public class App {
 	                    reversalService.rejectRequest(selected.getId(), manager, notes);
 	                    tx.commit();
 	                    
-	                    System.out.println("✅ Reversal request rejected.");
+	                    System.out.println("Reversal request rejected.");
 	                    
-	                    // Audit log
-	                    AuditService.logAction(
-	                        "REVERSAL_REJECTED",
-	                        String.format("Rejected reversal of TXN#%d ($%.2f). Reason: %s",
-	                            transaction.getId(),
-	                            transaction.getAmount(),
-	                            notes),
-	                        LocalDateTime.now(),
-	                        manager,
-	                        transaction.getSourceAccount()
-	                    );
+	                   
+	                    AuditService.logAction("REVERSAL_REJECTED",String.format("Rejected reversal of TXN#%d ($%.2f). Reason: %s",
+	                            transaction.getId(),transaction.getAmount(),notes),LocalDateTime.now(),manager,transaction.getSourceAccount());
 	                } catch (Exception e) {
 	                    if (tx.isActive()) {
 	                        tx.rollback();
 	                    }
-	                    System.err.println("❌ Error rejecting reversal: " + e.getMessage());
-	                    AuditService.logAction(
-	                        "REVERSAL_REJECTION_ERROR",
-	                        "Failed to reject reversal: " + e.getMessage(),
-	                        LocalDateTime.now(),
-	                        manager,
-	                        null
+	                    System.err.println("Error rejecting reversal: " + e.getMessage());
+	                    AuditService.logAction("REVERSAL_REJECTION_ERROR","Failed to reject reversal: " + e.getMessage(),
+	                        LocalDateTime.now(),manager,null
 	                    );
 	                }
 	            } catch (Exception e) {
-	                System.err.println("❌ System error: " + e.getMessage());
-	                AuditService.logAction(
-	                    "REVERSAL_REJECTION_ERROR",
-	                    "System error during rejection: " + e.getMessage(),
-	                    LocalDateTime.now(),
-	                    manager,
-	                    null
-	                );
+	                System.err.println("System error: " + e.getMessage());
+	                AuditService.logAction("REVERSAL_REJECTION_ERROR","System error during rejection: " + e.getMessage(),
+	                    LocalDateTime.now(),manager,null);
 	            }
 	        }
 	    } catch (Exception e) {
-	        System.err.println("❌ System error: " + e.getMessage());
-	        AuditService.logAction(
-	            "REVERSAL_REVIEW_ERROR",
-	            "Error reviewing reversals: " + e.getMessage(),
-	            LocalDateTime.now(),
-	            manager,
-	            null
-	        );
+	        System.err.println("System error: " + e.getMessage());
+	        AuditService.logAction("REVERSAL_REVIEW_ERROR","Error reviewing reversals: " + e.getMessage(),LocalDateTime.now(),
+	            manager,null);
 	    }
 	}
 	
-	///////////////////////////////////////
-
-
 	public static void handleInactivationRequests(Scanner scanner, User manager) {
 	    try (InactivationRequestService requestService = new InactivationRequestService()) {
 	        // Get pending requests
 	        List<AccountInactivationRequest> pendingRequests = requestService.findPendingRequests();
 
 	        if (pendingRequests.isEmpty()) {
-	            System.out.println("\nℹ️ There are no pending inactivation requests.");
+	            System.out.println("\nThere are no pending inactivation requests.");
 	            return;
 	        }
 
-	        // Display requests
-	        System.out.println("\n⏳ Pending Inactivation Requests:");
+	        System.out.println("\nPending Inactivation Requests:");
 	        for (int i = 0; i < pendingRequests.size(); i++) {
 	            AccountInactivationRequest req = pendingRequests.get(i);
 	            System.out.printf("%d. Account: %s | Client: %s (CPF: %s)%n", 
@@ -1151,31 +1035,28 @@ public class App {
 	                req.getAccount().getOwner().getCpf());
 	        }
 
-	        // Get selection
 	        System.out.print("\nSelect a request to handle (1-" + pendingRequests.size() + " or 0 to cancel): ");
 	        int choice;
 	        try {
 	            choice = scanner.nextInt();
-	            scanner.nextLine(); // Consume newline
+	            scanner.nextLine();
 	            
 	            if (choice == 0) {
-	                System.out.println("🚫 Operation cancelled.");
+	                System.out.println("Operation cancelled.");
 	                return;
 	            }
 	            
 	            if (choice < 1 || choice > pendingRequests.size()) {
-	                System.out.println("❌ Invalid selection.");
+	                System.out.println("Invalid selection.");
 	                return;
 	            }
 	        } catch (InputMismatchException e) {
-	            System.out.println("❌ Invalid input. Please enter a number.");
-	            scanner.nextLine(); // Clear invalid input
+	            System.out.println("Invalid input. Please enter a number.");
+	            scanner.nextLine();
 	            return;
 	        }
-
 	        AccountInactivationRequest selectedRequest = pendingRequests.get(choice - 1);
 
-	        // Get action
 	        System.out.println("\n1. Approve");
 	        System.out.println("2. Reject");
 	        System.out.print("Choose an action: ");
@@ -1186,46 +1067,39 @@ public class App {
 	            scanner.nextLine();
 	            
 	            if (action != 1 && action != 2) {
-	                System.out.println("❌ Invalid option.");
+	                System.out.println("Invalid option.");
 	                return;
 	            }
 	        } catch (InputMismatchException e) {
-	            System.out.println("❌ Invalid input. Please enter 1 or 2.");
+	            System.out.println("Invalid input. Please enter 1 or 2.");
 	            scanner.nextLine();
 	            return;
 	        }
 
-	        // Process action
 	        try {
 	        	if (action == 1) {
 	        	    System.out.print("Enter approval notes: ");
 	        	    String notes = scanner.nextLine();
 	        	    requestService.approveRequest(selectedRequest, manager, notes);
-	        	    System.out.println("\n✅ Request approved and account deactivated.");
+	        	    System.out.println("\nRequest approved and account deactivated.");
+	        	    // Here, AuditService is on Service
 	        	} else {
 	        	    System.out.print("Enter rejection reason: ");
 	        	    String reason = scanner.nextLine();
 	        	    requestService.rejectRequest(selectedRequest, manager, reason);
-	        	    System.out.println("\n✅ Request rejected.");
+	        	    System.out.println("\nRequest rejected.");
+	        	 // Here, AuditService is on Service
 	        	}
 	        } catch (Exception e) {
-	            System.err.println("\n❌ Error processing request: " + e.getMessage());
-	            AuditService.logAction(
-	                "INACTIVATION_REQUEST_ERROR",
-	                "Failed to process inactivation request: " + e.getMessage(),
-	                LocalDateTime.now(),
-	                manager,
-	                selectedRequest.getAccount()
+	            System.err.println("\nError processing request: " + e.getMessage());
+	            AuditService.logAction("INACTIVATION_REQUEST_ERROR", "Failed to process inactivation request: " + e.getMessage(),
+	                LocalDateTime.now(),manager,selectedRequest.getAccount()
 	            );
 	        }
 	    } catch (Exception e) {
-	        System.err.println("\n❌ System error: " + e.getMessage());
-	        AuditService.logAction(
-	            "INACTIVATION_REVIEW_ERROR",
-	            "Error reviewing inactivation requests: " + e.getMessage(),
-	            LocalDateTime.now(),
-	            manager,
-	            null
+	        System.err.println("\nSystem error: " + e.getMessage());
+	        AuditService.logAction("INACTIVATION_REVIEW_ERROR","Error reviewing inactivation requests: " + e.getMessage(),
+	            LocalDateTime.now(),manager,null
 	        );
 	    }
 	}
@@ -1326,8 +1200,7 @@ public class App {
 	                        try (AccountDAO accountDAO = new AccountDAO()) {
 	                            account.setBalance(account.getBalance() + depositAmount);
 	                            accountDAO.update(account);
-	                            AuditService.logAction("DEPOSIT", "Deposited $" + depositAmount, LocalDateTime.now(), client,
-	                                    account);
+	                            AuditService.logAction("DEPOSIT", "Deposited $" + depositAmount, LocalDateTime.now(), client,account);
 	                            System.out.printf("$%.2f deposited successfully.%n", depositAmount);
 	                        }
 	                    } else {
@@ -1367,14 +1240,12 @@ public class App {
 	                            System.out.println("Transfer amount must be greater than zero.");
 	                            break;
 	                        }
-	                        
-	                        
 
 	                        try (AccountDAO accountDAO = new AccountDAO();
 	                             TransactionDAO transactionDAO = new TransactionDAO()) {
 	                        	EntityTransaction tx = accountDAO.beginTransaction();
 	                        	if (tx == null) {
-	                                System.err.println("❌ Failed to start database transaction");
+	                                System.err.println("Failed to start database transaction");
 	                                return;
 	                            }
 	                            
@@ -1383,6 +1254,16 @@ public class App {
 	                            if (destination == null || !destination.getActive()) {
 	                                System.out.println("No account found with number: " + destAccountNumber);
 	                                break;
+	                            }
+	                            
+	                            if(destination.getClosureRequested()) {
+	                            	System.out.println("Destination account has pending closure request.");
+	                            	break;
+	                            }
+	                            
+	                            if(destination.getOwner().getBlocked()) {
+	                            	System.out.println("Client with the account destination is blocked");
+	                            	break;
 	                            }
 
 	                            if (account.getBalance() >= transferAmount) {
@@ -1394,7 +1275,6 @@ public class App {
 
 	                                LocalDateTime now = LocalDateTime.now();
 
-	                                // Outgoing transaction
 	                                Transaction transferOut = new Transaction();
 	                                transferOut.setSourceAccount(account);
 	                                transferOut.setTargetAccount(destination);
@@ -1403,7 +1283,6 @@ public class App {
 	                                transferOut.setType(TransactionType.TRANSFER_OUT);
 	                                transactionDAO.save(transferOut);
 
-	                                // Incoming transaction
 	                                Transaction transferIn = new Transaction();
 	                                transferIn.setSourceAccount(account);
 	                                transferIn.setTargetAccount(destination);
@@ -1412,7 +1291,6 @@ public class App {
 	                                transferIn.setType(TransactionType.TRANSFER_IN);
 	                                transactionDAO.save(transferIn);
 
-	                                // Audit logs
 	                                AuditService.logAction("TRANSFER_OUT",
 	                                        "Transferred $" + transferAmount + " to " + destAccountNumber, now, client, account);
 	                                AuditService.logAction("TRANSFER_IN",
@@ -1440,7 +1318,7 @@ public class App {
 	                        String reason = scanner.nextLine().trim();
 	                        
 	                        try {
-	                            // Create request outside the try-with-resources to maintain transaction
+	                            
 	                            AccountInactivationRequest request = new AccountInactivationRequest();
 	                            request.setAccount(account);
 	                            request.setRequester(client);
@@ -1448,19 +1326,18 @@ public class App {
 	                            request.setStatus(RequestStatus.PENDING);
 	                            request.setRequestDate(LocalDateTime.now());
 	                            
-	                            // Explicit service handling
 	                            try (InactivationRequestService service = new InactivationRequestService()) {
 	                                service.createRequest(request);
 	                                account.setClosureRequested(true);
-	                                System.out.println("✅ Account closure request submitted successfully!");
+	                                System.out.println("Account closure request submitted successfully!");
 	                            }
 	                            
-	                            // Add brief pause and clear buffer
+	                           
 	                            Thread.sleep(500);
-	                            break; // Explicitly break out of the menu loop
+	                            break; 
 	                        } catch (Exception e) {
 	                            System.out.println("❌ Error submitting request: " + e.getMessage());
-	                            // Consume any remaining input
+	                      
 	                            scanner.nextLine();
 	                        }
 	                    } else {
@@ -1477,7 +1354,7 @@ public class App {
 
 	                    System.out.print("Choose option: ");
 	                    int opt = scanner.nextInt();
-	                    scanner.nextLine(); // clear buffer
+	                    scanner.nextLine(); 
 	                    List<AuditLog> logs = new ArrayList<>();
 
 	                    try (AuditLogDAO auditLogDAO = new AuditLogDAO()) {
@@ -1578,47 +1455,35 @@ public class App {
 	            e.printStackTrace();
 	        }
 	    }
-	} //
-	///
-	///
-	///
-	///
-	///
-	///
-	///
-	///
-	///
-	///
-	///
-	///
-	/////
+	} 
 
 	public static void reversalRequestMenu(Scanner scanner, Client client, Account account) {
 	    try {
-	        // Verifica se a conta tem pedido de encerramento
 	        if (account.getClosureRequested()) {
-	            System.out.println("\n⚠️ Account has pending closure request");
+	            System.out.println("\nAccount has pending closure request");
 	            return;
 	        }
 
-	        // Busca transações reversíveis sem solicitações pendentes
 	        List<Transaction> reversibleTransactions;
 	        try (TransactionDAO transactionDAO = new TransactionDAO();
-	             ReversalRequestDAO reversalRequestDAO = new ReversalRequestDAO()) {
-	            
-	            reversibleTransactions = transactionDAO.findReversibleTransactions(account)
-	                .stream()
-	                .filter(txn -> !reversalRequestDAO.hasPendingReversalForTransaction(txn))
-	                .toList();
-	        }
+	        	     ReversalRequestDAO reversalRequestDAO = new ReversalRequestDAO()) {
+
+	        	    reversibleTransactions = transactionDAO.findReversibleTransactions(account)
+	        	        .stream()
+	        	        .filter(txn ->
+	        	            !reversalRequestDAO.hasPendingReversalForTransaction(txn) &&
+	        	            !reversalRequestDAO.hasApprovedReversalForTransaction(txn)
+	        	        )
+	        	        .toList();
+	        	}
+
 
 	        if (reversibleTransactions.isEmpty()) {
-	            System.out.println("\nℹ️ No reversible transactions available");
+	            System.out.println("\nNo reversible transactions available");
 	            return;
 	        }
 
-	        // Exibe menu de transações
-	        System.out.println("\n🔁 Select a transaction to request reversal:");
+	        System.out.println("\nSelect a transaction to request reversal:");
 	        for (int i = 0; i < reversibleTransactions.size(); i++) {
 	            Transaction txn = reversibleTransactions.get(i);
 	            String description = switch(txn.getType()) {
@@ -1636,9 +1501,8 @@ public class App {
 	        }
 	        
 	        System.out.println("0. Cancel");
-	        System.out.print("➡️ Your selection: ");
+	        System.out.print("Your selection: ");
 
-	        // Processa seleção do usuário
 	        try {
 	            int txChoice = scanner.nextInt();
 	            scanner.nextLine(); // Limpa buffer
@@ -1649,20 +1513,18 @@ public class App {
 
 	            Transaction selectedTransaction = reversibleTransactions.get(txChoice - 1);
 
-	            System.out.print("📝 Reason for reversal: ");
+	            System.out.print("Reason for reversal: ");
 	            String reason = scanner.nextLine().trim();
 
-	            // Validação do motivo
 	            if (reason.isEmpty()) {
-	                System.out.println("❌ Reason cannot be empty");
+	                System.out.println("Reason cannot be empty");
 	                return;
 	            }
 
-	            // Cria e processa a solicitação
+	          
 	            try (ReversalService reversalService = new ReversalService()) {
 	                reversalService.requestReversal(client, selectedTransaction, reason);
 	                
-	                // Auditoria
 	                AuditService.logAction("REVERSAL_REQUESTED",
 	                    String.format("Requested reversal for TXN#%d (Amount: $%.2f). Reason: %s", 
 	                        selectedTransaction.getId(),
@@ -1672,25 +1534,24 @@ public class App {
 	                    client, 
 	                    account);
 	                    
-	                System.out.println("\n✅ Reversal request submitted successfully!");
+	                System.out.println("\nReversal request submitted successfully!");
 	            }
 	            
 	        } catch (InputMismatchException e) {
-	            System.out.println("❌ Invalid input. Please enter a number.");
+	            System.out.println("Invalid input. Please enter a number.");
 	            scanner.nextLine();
 	        } catch (BusinessException e) {
-	            System.out.println("❌ Error: " + e.getMessage());
+	            System.out.println("Error: " + e.getMessage());
 	        }
 	    } catch (Exception e) {
-	        System.err.println("⚠️ System error: " + e.getMessage());
+	        System.err.println("System error: " + e.getMessage());
 	        e.printStackTrace();
 	    }
 	}
-///////////////////////
+
 	private static void registerAccount(Scanner scanner, Client client) {
 	    System.out.println("\n=== NEW ACCOUNT REGISTRATION === (Enter '0' at any time to cancel)");
 
-	    // Account Type selection
 	    AccountType accountType = null;
 	    boolean typeValid = false;
 	    do {
@@ -1736,7 +1597,6 @@ public class App {
 	        }
 	    } while (!typeValid);
 
-	    // Final confirmation
 	    System.out.println("\n=== REGISTRATION SUMMARY ===");
 	    System.out.println("Account Type: " + accountType);
 	    System.out.print("\nConfirm registration? (Y/N): ");
@@ -1759,24 +1619,16 @@ public class App {
 	        try (AccountDAO accountDAO = new AccountDAO()) {
 	            accountDAO.save(newAccount);
 	            
-	            // Log successful creation
-	            AuditService.logAction("ACCOUNT_CREATION", 
-	                "New " + accountType + " account created", 
-	                LocalDateTime.now(),
-	                client, 
-	                newAccount);
+	            AuditService.logAction("ACCOUNT_CREATION", "New " + accountType + " account created",LocalDateTime.now(),
+	                client, newAccount);
 
 	            System.out.println("\nRegistration successful!");
 	            System.out.println("Your account number: " + newAccount.getAccountNumber());
 	        }
 	    } catch (Exception e) {
-	        // Log failed creation attempt
 	        String accountNumber = (newAccount != null) ? newAccount.getAccountNumber() : "N/A";
-	        AuditService.logAction("ACCOUNT_CREATION_FAILED", 
-	            "Failed to create " + accountType + " account. Error: " + e.getMessage(), 
-	            LocalDateTime.now(),
-	            client, 
-	            null);
+	        AuditService.logAction("ACCOUNT_CREATION_FAILED", "Failed to create " + accountType + " account. Error: " + e.getMessage(), 
+	            LocalDateTime.now(),client, null);
 
 	        System.out.println("\nRegistration failed: " + e.getMessage());
 	        
@@ -1785,5 +1637,4 @@ public class App {
 	        }
 	    }
 	}
-
 }

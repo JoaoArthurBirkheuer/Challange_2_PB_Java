@@ -59,23 +59,19 @@ public class AuditLogDAO implements AutoCloseable{
         Root<AuditLog> log = cq.from(AuditLog.class);
         
         List<Predicate> predicates = new ArrayList<>();
-        
-        // Filtro por tipos de ação
+       
         if (actionTypes != null && !actionTypes.isEmpty()) {
             predicates.add(log.get("actionType").in(actionTypes));
         }
         
-        // Filtro por usuário
         if (user != null) {
             predicates.add(cb.equal(log.get("actor"), user));
         }
         
-        // Filtro por conta
         if (account != null) {
             predicates.add(cb.equal(log.get("affectedAccount"), account));
         }
         
-        // Filtro por intervalo de datas
         if (startDate != null) {
             predicates.add(cb.greaterThanOrEqualTo(log.get("timestamp"), startDate));
         }
@@ -84,7 +80,7 @@ public class AuditLogDAO implements AutoCloseable{
         }
         
         cq.where(predicates.toArray(new Predicate[0]));
-        cq.orderBy(cb.desc(log.get("timestamp"))); // Ordena por data mais recente
+        cq.orderBy(cb.desc(log.get("timestamp"))); 
         
         TypedQuery<AuditLog> query = em.createQuery(cq);
         return query.getResultList();
